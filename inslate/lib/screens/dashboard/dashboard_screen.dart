@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/enums/record_subtype.dart';
-import '../../core/enums/transaction_status.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/financial_records.dart';
 import '../../models/financial_summary.dart';
@@ -148,20 +147,26 @@ class _DashboardHeader extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 42,
-            height: 42,
-            alignment: Alignment.center,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
-              color: const Color(0xFF0F9D8A),
-              borderRadius: BorderRadius.circular(13),
+              borderRadius: BorderRadius.circular(14),
+
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-            child: const Text(
-              'IS',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Image.asset(
+                'lib/assets/images/inslate_logo.png',
+                width: 48,
+                height: 48,
+                fit: BoxFit.cover,
               ),
             ),
           ),
