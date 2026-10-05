@@ -20,19 +20,15 @@ class AccountTransferParser implements Parser {
 
       if (classification.subtype == RecordSubtype.mshwariDeposit) {
         title = RecordTitles.mshwariDeposit;
-
         party = const Party(name: 'M-Shwari', type: PartyType.self);
       } else if (classification.subtype == RecordSubtype.mshwariWithdrawal) {
         title = RecordTitles.mshwariWithdrawal;
-
         party = const Party(name: 'M-Shwari', type: PartyType.self);
       } else if (classification.subtype == RecordSubtype.kcbDeposit) {
         title = RecordTitles.kcbDeposit;
-
         party = const Party(name: 'KCB M-PESA', type: PartyType.self);
       } else if (classification.subtype == RecordSubtype.kcbWithdrawal) {
         title = RecordTitles.kcbWithdrawal;
-
         party = const Party(name: 'KCB M-PESA', type: PartyType.self);
       } else {
         return const ParseResult.failure('Unsupported transfer type.');
@@ -43,6 +39,8 @@ class AccountTransferParser implements Parser {
         classification: classification,
         title: title,
         rawMessage: message.body,
+        sourceMessageId: message.id,
+        receivedAt: message.receivedAt,
         party: party,
       );
 

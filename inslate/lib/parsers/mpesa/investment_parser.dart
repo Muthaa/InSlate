@@ -69,6 +69,8 @@ class InvestmentParser implements Parser {
         classification: classification,
         title: title,
         rawMessage: message.body,
+        sourceMessageId: message.id,
+        receivedAt: message.receivedAt,
         party: party,
       );
 

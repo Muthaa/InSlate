@@ -54,6 +54,8 @@ class SendMoneyParser implements Parser {
         classification: classification,
         title: RecordTitles.sendMoney,
         rawMessage: message.body,
+        sourceMessageId: message.id,
+        receivedAt: message.receivedAt,
         party: party,
       );
 

@@ -8,6 +8,7 @@ import '/parsers/mpesa/cash_transaction_parser.dart';
 import '/parsers/mpesa/account_transfer_parser.dart';
 import '/parsers/mpesa/fuliza_parser.dart';
 import '/parsers/mpesa/investment_parser.dart';
+import '/parsers/mpesa/airtime_parser.dart';
 
 class ParserFactory {
   ParserFactory._();
@@ -43,6 +44,9 @@ class ParserFactory {
       case RecordSubtype.investmentPurchase:
       case RecordSubtype.investmentRedemption:
         return InvestmentParser();
+
+      case RecordSubtype.airtimePurchase:
+        return AirtimeParser();
 
       default:
         return null;

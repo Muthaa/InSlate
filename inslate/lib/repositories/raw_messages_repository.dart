@@ -51,8 +51,54 @@ class RawMessagesRepository {
         .toList();
   }
 
+  Future<domain.RawMessage?> getLatest() async {
+    final row = await database.rawMessagesDao.getLatestMessage();
+
+    if (row == null) {
+      return null;
+    }
+
+    return domain.RawMessage(
+      id: row.sourceId,
+      sender: row.sender,
+      body: row.body,
+      receivedAt: row.receivedAt,
+    );
+  }
+
   Future<List<String>> getExistingSourceIds(List<String> sourceIds) {
     return database.rawMessagesDao.getExistingSourceIds(sourceIds);
+  }
+
+  Future<List<domain.RawMessage>> getExistingBySenderAndBodies(
+    List<domain.RawMessage> messages,
+  ) async {
+    final bodiesBySender = <String, Set<String>>{};
+
+    for (final message in messages) {
+      bodiesBySender
+          .putIfAbsent(message.sender, () => <String>{})
+          .add(message.body);
+    }
+
+    if (bodiesBySender.isEmpty) {
+      return [];
+    }
+
+    final rows = await database.rawMessagesDao.getBySenderAndBodies(
+      bodiesBySender.map((sender, bodies) => MapEntry(sender, bodies.toList())),
+    );
+
+    return rows
+        .map(
+          (row) => domain.RawMessage(
+            id: row.sourceId,
+            sender: row.sender,
+            body: row.body,
+            receivedAt: row.receivedAt,
+          ),
+        )
+        .toList();
   }
 
   Future<void> saveAll(List<domain.RawMessage> messages) async {

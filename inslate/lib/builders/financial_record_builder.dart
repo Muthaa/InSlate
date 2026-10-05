@@ -12,7 +12,9 @@ class FinancialRecordBuilder {
     required ClassificationResult classification,
     required String title,
     required String rawMessage,
+    required String sourceMessageId,
     Party? party,
+    required DateTime receivedAt,
   }) {
     return FinancialRecord(
       reference: common.reference,
@@ -20,11 +22,13 @@ class FinancialRecordBuilder {
       amount: common.amount,
       balance: common.balance,
       transactionCost: common.transactionCost,
+      receivedAt: receivedAt,
       type: FinancialRecordTypeMapper.fromSubtype(classification.subtype),
       subtype: classification.subtype,
       status: classification.status,
       title: title,
       rawMessage: rawMessage,
+      sourceMessageId: sourceMessageId,
       party: party,
     );
   }

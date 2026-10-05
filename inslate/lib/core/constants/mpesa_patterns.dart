@@ -22,6 +22,12 @@ class MpesaPatterns {
     caseSensitive: false,
   );
 
+  /// Account balance reported in failed M-Shwari/KCB account operations.
+  static final accountAvailableBalance = RegExp(
+    r'(?:account\s+)?available\s+balance\s+is\s+Ksh\s?([\d,]+\.\d{2})',
+    caseSensitive: false,
+  );
+
   /// Transaction Cost
   static final transactionCost = RegExp(
     r'(?:Transaction cost,?\s*Ksh\.?|Access Fee charged\s+Ksh\s*)([\d,]+\.\d{2})',
@@ -111,7 +117,7 @@ class MpesaPatterns {
   );
 
   static final mshwariWithdrawal = RegExp(
-    r'transferred\s+from\s+M-Shwari',
+    r'(?:transferred\s+from\s+M-Shwari|M-Shwari.*?withdraw)',
     caseSensitive: false,
   );
 
@@ -121,7 +127,7 @@ class MpesaPatterns {
   );
 
   static final kcbWithdrawal = RegExp(
-    r'transfered\s+Ksh.*?from\s+your\s+KCB\s+M-PESA\s+account',
+    r'(?:transfered\s+Ksh.*?from\s+your\s+KCB\s+M-PESA\s+account|withdrawal\s+from\s+your\s+KCB\s+M-PESA\s+account)',
     caseSensitive: false,
   );
 
@@ -146,7 +152,7 @@ class MpesaPatterns {
   );
 
   static final investmentRedemption = RegExp(
-    r'from\s+(.+?)\s+(\d+)\s+on',
+    r'from\s+(.+?)[.\s]+(\d+)\s+on\s+\d',
     caseSensitive: false,
   );
 }

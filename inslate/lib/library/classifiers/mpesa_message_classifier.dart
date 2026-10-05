@@ -34,6 +34,42 @@ class MpesaMessageClassifier implements MessageClassifier {
       return _result(MessageType.notification, RecordSubtype.unknown, status);
     }
 
+    // Investment Purchase
+    bool containsInvestment(String text) {
+      final balanceIndex = text.indexOf('new m-pesa balance');
+
+      final transactionText = balanceIndex >= 0
+          ? text.substring(0, balanceIndex)
+          : text;
+
+      return InvestmentKeywords.providers.any(transactionText.contains);
+    }
+
+    if (text.contains(MpesaKeywords.sentTo) &&
+        text.contains(MpesaKeywords.forAccount) &&
+        containsInvestment(text)) {
+      return _result(
+        MessageType.transaction,
+        RecordSubtype.investmentPurchase,
+        status,
+      );
+    }
+
+    // --------------------------------------------------
+    // Investment Redemption
+    // Must be checked before generic Receive Money
+    // --------------------------------------------------
+
+    if (text.contains(MpesaKeywords.received) &&
+        text.contains(' from ') &&
+        containsInvestment(text)) {
+      return _result(
+        MessageType.transaction,
+        RecordSubtype.investmentRedemption,
+        status,
+      );
+    }
+
     // --------------------------------------------------
     // PayBill
     // Must be checked before Send Money
@@ -50,17 +86,14 @@ class MpesaMessageClassifier implements MessageClassifier {
       return _result(MessageType.transaction, RecordSubtype.buyGoods, status);
     }
 
-    // Investment Purchase
-    bool containsInvestment(String text) {
-      return InvestmentKeywords.providers.any(text.contains);
-    }
+    // --------------------------------------------------
+    // Airtime Purchase
+    // --------------------------------------------------
 
-    if (text.contains(MpesaKeywords.sentTo) &&
-        text.contains(MpesaKeywords.forAccount) &&
-        containsInvestment(text)) {
+    if (text.contains('bought') && text.contains('airtime')) {
       return _result(
         MessageType.transaction,
-        RecordSubtype.investmentPurchase,
+        RecordSubtype.airtimePurchase,
         status,
       );
     }
@@ -91,15 +124,6 @@ class MpesaMessageClassifier implements MessageClassifier {
 
     if (MpesaPatterns.cashDeposit.hasMatch(message)) {
       return _result(MessageType.transaction, RecordSubtype.deposit, status);
-    }
-
-    // --------------------------------------------------
-    // Agent Withdrawal
-    // --------------------------------------------------
-
-    if (text.contains(MpesaKeywords.amWithdraw) ||
-        text.contains(MpesaKeywords.withdraw)) {
-      return _result(MessageType.transaction, RecordSubtype.withdrawal, status);
     }
 
     // --------------------------------------------------
@@ -144,6 +168,15 @@ class MpesaMessageClassifier implements MessageClassifier {
         RecordSubtype.kcbWithdrawal,
         status,
       );
+    }
+
+    // --------------------------------------------------
+    // Agent Withdrawal
+    // --------------------------------------------------
+
+    if (text.contains(MpesaKeywords.amWithdraw) ||
+        text.contains(MpesaKeywords.withdraw)) {
+      return _result(MessageType.transaction, RecordSubtype.withdrawal, status);
     }
 
     // --------------------------------------------------

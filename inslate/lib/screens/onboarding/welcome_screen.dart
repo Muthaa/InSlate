@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
+import '../../core/theme/app_theme.dart';
 import '../../core/branding/app_brand.dart';
 import 'setup_screen.dart';
 
@@ -27,7 +27,7 @@ class WelcomeScreen extends ConsumerWidget {
                 height: 112,
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: colors.primary,
+                  color: AppTheme.darkBlue,
                   shape: BoxShape.circle,
                 ),
                 child: Image.asset(

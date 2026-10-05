@@ -26,6 +26,10 @@ class FinancialRecord {
 
   final String rawMessage;
 
+  final DateTime receivedAt;
+
+  final String? sourceMessageId;
+
   const FinancialRecord({
     required this.reference,
     required this.transactionDate,
@@ -36,6 +40,8 @@ class FinancialRecord {
     required this.status,
     required this.title,
     required this.rawMessage,
+    required this.receivedAt,
+    this.sourceMessageId,
     this.party,
     this.transactionCost = 0,
   });

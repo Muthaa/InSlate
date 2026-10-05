@@ -46,6 +46,8 @@ class ReceiveMoneyParser implements Parser {
         classification: classification,
         title: RecordTitles.receiveMoney,
         rawMessage: message.body,
+        sourceMessageId: message.id,
+        receivedAt: message.receivedAt,
         party: party,
       );
 

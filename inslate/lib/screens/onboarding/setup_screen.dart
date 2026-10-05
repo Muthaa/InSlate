@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/app_preferences_provider.dart';
 import '../../models/import_progress.dart';
 import '../../providers/import_provider.dart';
-import '../dashboard/dashboard_screen.dart';
+import '../app_shell.dart';
 
 class SetupScreen extends ConsumerStatefulWidget {
   const SetupScreen({super.key});
@@ -43,6 +43,10 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
           previous?.status != ImportStatus.completed) {
         final preferences = await ref.read(appPreferencesProvider.future);
 
+        if (next.failed == 0) {
+          await preferences.setInitialImportCompleted();
+        }
+
         await preferences.setOnboardingCompleted();
 
         if (!context.mounted) {
@@ -50,7 +54,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
         }
 
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const DashboardScreen()),
+          MaterialPageRoute(builder: (_) => const AppShell()),
           (route) => false,
         );
       }

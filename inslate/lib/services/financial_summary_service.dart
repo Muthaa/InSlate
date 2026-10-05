@@ -11,11 +11,7 @@ class FinancialSummaryService {
     required DateTime period,
   }) {
     final periodRecords = records.where((record) {
-      final date = record.transactionDate;
-
-      if (date == null) {
-        return false;
-      }
+      final date = record.transactionDate ?? record.receivedAt;
 
       return date.year == period.year && date.month == period.month;
     }).toList();
@@ -33,6 +29,18 @@ class FinancialSummaryService {
     int expenseTransactionCount = 0;
     int incomeTransactionCount = 0;
 
+    double totalLoansBorrowed = 0;
+    double totalLoanRepayments = 0;
+
+    int loanBorrowingTransactionCount = 0;
+    int loanRepaymentTransactionCount = 0;
+
+    double totalInvested = 0;
+    double totalInvestmentWithdrawals = 0;
+
+    int investmentTransactionCount = 0;
+    int investmentWithdrawalTransactionCount = 0;
+
     final spendingBySubtype = <RecordSubtype, double>{};
     final transactionCountBySubtype = <RecordSubtype, int>{};
 
@@ -46,6 +54,14 @@ class FinancialSummaryService {
 
     for (final record in periodRecords) {
       totalFees += record.transactionCost;
+
+      if (record.subtype == RecordSubtype.investmentPurchase) {
+        totalInvested += record.amount;
+        investmentTransactionCount++;
+      } else if (record.subtype == RecordSubtype.investmentRedemption) {
+        totalInvestmentWithdrawals += record.amount;
+        investmentWithdrawalTransactionCount++;
+      }
 
       switch (record.type) {
         case FinancialRecordType.income:
@@ -86,10 +102,6 @@ class FinancialSummaryService {
           break;
 
         case FinancialRecordType.transfer:
-          if (record.subtype == RecordSubtype.deposit) {
-            moneyInBySubtype[record.subtype] =
-                (moneyInBySubtype[record.subtype] ?? 0) + record.amount;
-          }
           _calculateInternalTransfer(
             record,
             onIncoming: (amount) {
@@ -103,6 +115,17 @@ class FinancialSummaryService {
           break;
 
         case FinancialRecordType.loan:
+          if (record.subtype == RecordSubtype.fulizaLoan ||
+              record.subtype == RecordSubtype.loanDisbursement) {
+            totalLoansBorrowed += record.amount;
+            loanBorrowingTransactionCount++;
+          } else if (record.subtype == RecordSubtype.fulizaRepayment ||
+              record.subtype == RecordSubtype.loanRepayment) {
+            totalLoanRepayments += record.amount;
+            loanRepaymentTransactionCount++;
+          }
+          break;
+
         case FinancialRecordType.savings:
         case FinancialRecordType.investment:
         case FinancialRecordType.repayment:
@@ -194,6 +217,15 @@ class FinancialSummaryService {
       topIncome: topIncome,
       expensePartyCount: expensePartyCount,
       incomePartyCount: incomePartyCount,
+      totalLoansBorrowed: totalLoansBorrowed,
+      totalLoanRepayments: totalLoanRepayments,
+      loanBorrowingTransactionCount: loanBorrowingTransactionCount,
+      loanRepaymentTransactionCount: loanRepaymentTransactionCount,
+      totalInvested: totalInvested,
+      totalInvestmentWithdrawals: totalInvestmentWithdrawals,
+      investmentTransactionCount: investmentTransactionCount,
+      investmentWithdrawalTransactionCount:
+          investmentWithdrawalTransactionCount,
     );
   }
 

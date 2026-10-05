@@ -14,10 +14,10 @@ class FinancialRecordsDao extends DatabaseAccessor<AppDatabase>
     return select(financialRecords).get();
   }
 
-  Future<FinancialRecord?> getRecordByReference(String reference) {
+  Future<List<FinancialRecord>> getRecordsByReference(String reference) {
     return (select(
       financialRecords,
-    )..where((record) => record.reference.equals(reference))).getSingleOrNull();
+    )..where((record) => record.reference.equals(reference))).get();
   }
 
   Future<int> insertRecord(FinancialRecordsCompanion record) {
@@ -25,7 +25,11 @@ class FinancialRecordsDao extends DatabaseAccessor<AppDatabase>
   }
 
   Future<bool> recordExists(String reference) async {
-    final record = await getRecordByReference(reference);
+    final record =
+        await (select(financialRecords)
+              ..where((row) => row.reference.equals(reference))
+              ..limit(1))
+            .getSingleOrNull();
     return record != null;
   }
 
@@ -39,6 +43,20 @@ class FinancialRecordsDao extends DatabaseAccessor<AppDatabase>
     )..where((record) => record.reference.isIn(references))).get();
 
     return rows.map((row) => row.reference).toList();
+  }
+
+  Future<List<String>> getExistingSourceMessageIds(
+    List<String> sourceMessageIds,
+  ) async {
+    if (sourceMessageIds.isEmpty) {
+      return [];
+    }
+
+    final rows = await (select(
+      financialRecords,
+    )..where((record) => record.sourceMessageId.isIn(sourceMessageIds))).get();
+
+    return rows.map((row) => row.sourceMessageId).whereType<String>().toList();
   }
 
   Future<void> insertRecords(List<FinancialRecordsCompanion> records) async {

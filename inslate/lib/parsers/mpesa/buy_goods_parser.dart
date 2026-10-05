@@ -33,6 +33,8 @@ class BuyGoodsParser implements Parser {
         classification: classification,
         title: RecordTitles.buyGoods,
         rawMessage: message.body,
+        sourceMessageId: message.id,
+        receivedAt: message.receivedAt,
         party: party,
       );
 

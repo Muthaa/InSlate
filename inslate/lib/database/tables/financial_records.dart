@@ -1,11 +1,16 @@
 import 'package:drift/drift.dart';
 
+@TableIndex(name: 'financial_records_reference_idx', columns: {#reference})
 class FinancialRecords extends Table {
   IntColumn get id => integer().autoIncrement()();
 
-  TextColumn get reference => text().unique()();
+  TextColumn get reference => text()();
+
+  TextColumn get sourceMessageId => text().nullable()();
 
   DateTimeColumn get transactionDate => dateTime().nullable()();
+
+  DateTimeColumn get receivedAt => dateTime()();
 
   RealColumn get amount => real()();
 

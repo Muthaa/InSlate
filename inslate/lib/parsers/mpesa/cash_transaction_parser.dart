@@ -33,6 +33,8 @@ class CashTransactionParser implements Parser {
           classification: classification,
           title: RecordTitles.cashDeposit,
           rawMessage: message.body,
+          sourceMessageId: message.id,
+          receivedAt: message.receivedAt,
           party: party,
         );
 
@@ -57,6 +59,8 @@ class CashTransactionParser implements Parser {
           classification: classification,
           title: RecordTitles.cashWithdrawal,
           rawMessage: message.body,
+          sourceMessageId: message.id,
+          receivedAt: message.receivedAt,
           party: party,
         );
 

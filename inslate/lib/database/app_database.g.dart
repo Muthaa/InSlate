@@ -478,7 +478,17 @@ class $FinancialRecordsTable extends FinancialRecords
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
-    defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
+  );
+  static const VerificationMeta _sourceMessageIdMeta = const VerificationMeta(
+    'sourceMessageId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceMessageId = GeneratedColumn<String>(
+    'source_message_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _transactionDateMeta = const VerificationMeta(
     'transactionDate',
@@ -492,6 +502,17 @@ class $FinancialRecordsTable extends FinancialRecords
         type: DriftSqlType.dateTime,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _receivedAtMeta = const VerificationMeta(
+    'receivedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> receivedAt = GeneratedColumn<DateTime>(
+    'received_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
   static const VerificationMeta _amountMeta = const VerificationMeta('amount');
   @override
   late final GeneratedColumn<double> amount = GeneratedColumn<double>(
@@ -664,7 +685,9 @@ class $FinancialRecordsTable extends FinancialRecords
   List<GeneratedColumn> get $columns => [
     id,
     reference,
+    sourceMessageId,
     transactionDate,
+    receivedAt,
     amount,
     balance,
     transactionCost,
@@ -705,6 +728,15 @@ class $FinancialRecordsTable extends FinancialRecords
     } else if (isInserting) {
       context.missing(_referenceMeta);
     }
+    if (data.containsKey('source_message_id')) {
+      context.handle(
+        _sourceMessageIdMeta,
+        sourceMessageId.isAcceptableOrUnknown(
+          data['source_message_id']!,
+          _sourceMessageIdMeta,
+        ),
+      );
+    }
     if (data.containsKey('transaction_date')) {
       context.handle(
         _transactionDateMeta,
@@ -713,6 +745,14 @@ class $FinancialRecordsTable extends FinancialRecords
           _transactionDateMeta,
         ),
       );
+    }
+    if (data.containsKey('received_at')) {
+      context.handle(
+        _receivedAtMeta,
+        receivedAt.isAcceptableOrUnknown(data['received_at']!, _receivedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_receivedAtMeta);
     }
     if (data.containsKey('amount')) {
       context.handle(
@@ -854,10 +894,18 @@ class $FinancialRecordsTable extends FinancialRecords
         DriftSqlType.string,
         data['${effectivePrefix}reference'],
       )!,
+      sourceMessageId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_message_id'],
+      ),
       transactionDate: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}transaction_date'],
       ),
+      receivedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}received_at'],
+      )!,
       amount: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}amount'],
@@ -934,7 +982,9 @@ class $FinancialRecordsTable extends FinancialRecords
 class FinancialRecord extends DataClass implements Insertable<FinancialRecord> {
   final int id;
   final String reference;
+  final String? sourceMessageId;
   final DateTime? transactionDate;
+  final DateTime receivedAt;
   final double amount;
   final double? balance;
   final double? transactionCost;
@@ -954,7 +1004,9 @@ class FinancialRecord extends DataClass implements Insertable<FinancialRecord> {
   const FinancialRecord({
     required this.id,
     required this.reference,
+    this.sourceMessageId,
     this.transactionDate,
+    required this.receivedAt,
     required this.amount,
     this.balance,
     this.transactionCost,
@@ -977,9 +1029,13 @@ class FinancialRecord extends DataClass implements Insertable<FinancialRecord> {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['reference'] = Variable<String>(reference);
+    if (!nullToAbsent || sourceMessageId != null) {
+      map['source_message_id'] = Variable<String>(sourceMessageId);
+    }
     if (!nullToAbsent || transactionDate != null) {
       map['transaction_date'] = Variable<DateTime>(transactionDate);
     }
+    map['received_at'] = Variable<DateTime>(receivedAt);
     map['amount'] = Variable<double>(amount);
     if (!nullToAbsent || balance != null) {
       map['balance'] = Variable<double>(balance);
@@ -1021,9 +1077,13 @@ class FinancialRecord extends DataClass implements Insertable<FinancialRecord> {
     return FinancialRecordsCompanion(
       id: Value(id),
       reference: Value(reference),
+      sourceMessageId: sourceMessageId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sourceMessageId),
       transactionDate: transactionDate == null && nullToAbsent
           ? const Value.absent()
           : Value(transactionDate),
+      receivedAt: Value(receivedAt),
       amount: Value(amount),
       balance: balance == null && nullToAbsent
           ? const Value.absent()
@@ -1069,7 +1129,9 @@ class FinancialRecord extends DataClass implements Insertable<FinancialRecord> {
     return FinancialRecord(
       id: serializer.fromJson<int>(json['id']),
       reference: serializer.fromJson<String>(json['reference']),
+      sourceMessageId: serializer.fromJson<String?>(json['sourceMessageId']),
       transactionDate: serializer.fromJson<DateTime?>(json['transactionDate']),
+      receivedAt: serializer.fromJson<DateTime>(json['receivedAt']),
       amount: serializer.fromJson<double>(json['amount']),
       balance: serializer.fromJson<double?>(json['balance']),
       transactionCost: serializer.fromJson<double?>(json['transactionCost']),
@@ -1096,7 +1158,9 @@ class FinancialRecord extends DataClass implements Insertable<FinancialRecord> {
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'reference': serializer.toJson<String>(reference),
+      'sourceMessageId': serializer.toJson<String?>(sourceMessageId),
       'transactionDate': serializer.toJson<DateTime?>(transactionDate),
+      'receivedAt': serializer.toJson<DateTime>(receivedAt),
       'amount': serializer.toJson<double>(amount),
       'balance': serializer.toJson<double?>(balance),
       'transactionCost': serializer.toJson<double?>(transactionCost),
@@ -1119,7 +1183,9 @@ class FinancialRecord extends DataClass implements Insertable<FinancialRecord> {
   FinancialRecord copyWith({
     int? id,
     String? reference,
+    Value<String?> sourceMessageId = const Value.absent(),
     Value<DateTime?> transactionDate = const Value.absent(),
+    DateTime? receivedAt,
     double? amount,
     Value<double?> balance = const Value.absent(),
     Value<double?> transactionCost = const Value.absent(),
@@ -1139,9 +1205,13 @@ class FinancialRecord extends DataClass implements Insertable<FinancialRecord> {
   }) => FinancialRecord(
     id: id ?? this.id,
     reference: reference ?? this.reference,
+    sourceMessageId: sourceMessageId.present
+        ? sourceMessageId.value
+        : this.sourceMessageId,
     transactionDate: transactionDate.present
         ? transactionDate.value
         : this.transactionDate,
+    receivedAt: receivedAt ?? this.receivedAt,
     amount: amount ?? this.amount,
     balance: balance.present ? balance.value : this.balance,
     transactionCost: transactionCost.present
@@ -1171,9 +1241,15 @@ class FinancialRecord extends DataClass implements Insertable<FinancialRecord> {
     return FinancialRecord(
       id: data.id.present ? data.id.value : this.id,
       reference: data.reference.present ? data.reference.value : this.reference,
+      sourceMessageId: data.sourceMessageId.present
+          ? data.sourceMessageId.value
+          : this.sourceMessageId,
       transactionDate: data.transactionDate.present
           ? data.transactionDate.value
           : this.transactionDate,
+      receivedAt: data.receivedAt.present
+          ? data.receivedAt.value
+          : this.receivedAt,
       amount: data.amount.present ? data.amount.value : this.amount,
       balance: data.balance.present ? data.balance.value : this.balance,
       transactionCost: data.transactionCost.present
@@ -1212,7 +1288,9 @@ class FinancialRecord extends DataClass implements Insertable<FinancialRecord> {
     return (StringBuffer('FinancialRecord(')
           ..write('id: $id, ')
           ..write('reference: $reference, ')
+          ..write('sourceMessageId: $sourceMessageId, ')
           ..write('transactionDate: $transactionDate, ')
+          ..write('receivedAt: $receivedAt, ')
           ..write('amount: $amount, ')
           ..write('balance: $balance, ')
           ..write('transactionCost: $transactionCost, ')
@@ -1234,10 +1312,12 @@ class FinancialRecord extends DataClass implements Insertable<FinancialRecord> {
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     reference,
+    sourceMessageId,
     transactionDate,
+    receivedAt,
     amount,
     balance,
     transactionCost,
@@ -1254,14 +1334,16 @@ class FinancialRecord extends DataClass implements Insertable<FinancialRecord> {
     partyAccount,
     partyIdentifier,
     createdAt,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is FinancialRecord &&
           other.id == this.id &&
           other.reference == this.reference &&
+          other.sourceMessageId == this.sourceMessageId &&
           other.transactionDate == this.transactionDate &&
+          other.receivedAt == this.receivedAt &&
           other.amount == this.amount &&
           other.balance == this.balance &&
           other.transactionCost == this.transactionCost &&
@@ -1283,7 +1365,9 @@ class FinancialRecord extends DataClass implements Insertable<FinancialRecord> {
 class FinancialRecordsCompanion extends UpdateCompanion<FinancialRecord> {
   final Value<int> id;
   final Value<String> reference;
+  final Value<String?> sourceMessageId;
   final Value<DateTime?> transactionDate;
+  final Value<DateTime> receivedAt;
   final Value<double> amount;
   final Value<double?> balance;
   final Value<double?> transactionCost;
@@ -1303,7 +1387,9 @@ class FinancialRecordsCompanion extends UpdateCompanion<FinancialRecord> {
   const FinancialRecordsCompanion({
     this.id = const Value.absent(),
     this.reference = const Value.absent(),
+    this.sourceMessageId = const Value.absent(),
     this.transactionDate = const Value.absent(),
+    this.receivedAt = const Value.absent(),
     this.amount = const Value.absent(),
     this.balance = const Value.absent(),
     this.transactionCost = const Value.absent(),
@@ -1324,7 +1410,9 @@ class FinancialRecordsCompanion extends UpdateCompanion<FinancialRecord> {
   FinancialRecordsCompanion.insert({
     this.id = const Value.absent(),
     required String reference,
+    this.sourceMessageId = const Value.absent(),
     this.transactionDate = const Value.absent(),
+    required DateTime receivedAt,
     required double amount,
     this.balance = const Value.absent(),
     this.transactionCost = const Value.absent(),
@@ -1342,6 +1430,7 @@ class FinancialRecordsCompanion extends UpdateCompanion<FinancialRecord> {
     this.partyIdentifier = const Value.absent(),
     this.createdAt = const Value.absent(),
   }) : reference = Value(reference),
+       receivedAt = Value(receivedAt),
        amount = Value(amount),
        type = Value(type),
        subtype = Value(subtype),
@@ -1351,7 +1440,9 @@ class FinancialRecordsCompanion extends UpdateCompanion<FinancialRecord> {
   static Insertable<FinancialRecord> custom({
     Expression<int>? id,
     Expression<String>? reference,
+    Expression<String>? sourceMessageId,
     Expression<DateTime>? transactionDate,
+    Expression<DateTime>? receivedAt,
     Expression<double>? amount,
     Expression<double>? balance,
     Expression<double>? transactionCost,
@@ -1372,7 +1463,9 @@ class FinancialRecordsCompanion extends UpdateCompanion<FinancialRecord> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (reference != null) 'reference': reference,
+      if (sourceMessageId != null) 'source_message_id': sourceMessageId,
       if (transactionDate != null) 'transaction_date': transactionDate,
+      if (receivedAt != null) 'received_at': receivedAt,
       if (amount != null) 'amount': amount,
       if (balance != null) 'balance': balance,
       if (transactionCost != null) 'transaction_cost': transactionCost,
@@ -1396,7 +1489,9 @@ class FinancialRecordsCompanion extends UpdateCompanion<FinancialRecord> {
   FinancialRecordsCompanion copyWith({
     Value<int>? id,
     Value<String>? reference,
+    Value<String?>? sourceMessageId,
     Value<DateTime?>? transactionDate,
+    Value<DateTime>? receivedAt,
     Value<double>? amount,
     Value<double?>? balance,
     Value<double?>? transactionCost,
@@ -1417,7 +1512,9 @@ class FinancialRecordsCompanion extends UpdateCompanion<FinancialRecord> {
     return FinancialRecordsCompanion(
       id: id ?? this.id,
       reference: reference ?? this.reference,
+      sourceMessageId: sourceMessageId ?? this.sourceMessageId,
       transactionDate: transactionDate ?? this.transactionDate,
+      receivedAt: receivedAt ?? this.receivedAt,
       amount: amount ?? this.amount,
       balance: balance ?? this.balance,
       transactionCost: transactionCost ?? this.transactionCost,
@@ -1446,8 +1543,14 @@ class FinancialRecordsCompanion extends UpdateCompanion<FinancialRecord> {
     if (reference.present) {
       map['reference'] = Variable<String>(reference.value);
     }
+    if (sourceMessageId.present) {
+      map['source_message_id'] = Variable<String>(sourceMessageId.value);
+    }
     if (transactionDate.present) {
       map['transaction_date'] = Variable<DateTime>(transactionDate.value);
+    }
+    if (receivedAt.present) {
+      map['received_at'] = Variable<DateTime>(receivedAt.value);
     }
     if (amount.present) {
       map['amount'] = Variable<double>(amount.value);
@@ -1505,7 +1608,9 @@ class FinancialRecordsCompanion extends UpdateCompanion<FinancialRecord> {
     return (StringBuffer('FinancialRecordsCompanion(')
           ..write('id: $id, ')
           ..write('reference: $reference, ')
+          ..write('sourceMessageId: $sourceMessageId, ')
           ..write('transactionDate: $transactionDate, ')
+          ..write('receivedAt: $receivedAt, ')
           ..write('amount: $amount, ')
           ..write('balance: $balance, ')
           ..write('transactionCost: $transactionCost, ')
@@ -1932,6 +2037,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     this,
   );
   late final $RawMessagesTable rawMessages = $RawMessagesTable(this);
+  late final Index financialRecordsReferenceIdx = Index(
+    'financial_records_reference_idx',
+    'CREATE INDEX financial_records_reference_idx ON financial_records (reference)',
+  );
+  late final Index rawMessagesSenderBodyIdx = Index(
+    'raw_messages_sender_body_idx',
+    'CREATE INDEX raw_messages_sender_body_idx ON raw_messages (sender, body)',
+  );
   late final AccountsDao accountsDao = AccountsDao(this as AppDatabase);
   late final FinancialRecordsDao financialRecordsDao = FinancialRecordsDao(
     this as AppDatabase,
@@ -1947,6 +2060,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     accounts,
     financialRecords,
     rawMessages,
+    financialRecordsReferenceIdx,
+    rawMessagesSenderBodyIdx,
   ];
 }
 
@@ -2182,7 +2297,9 @@ typedef $$FinancialRecordsTableCreateCompanionBuilder =
     FinancialRecordsCompanion Function({
       Value<int> id,
       required String reference,
+      Value<String?> sourceMessageId,
       Value<DateTime?> transactionDate,
+      required DateTime receivedAt,
       required double amount,
       Value<double?> balance,
       Value<double?> transactionCost,
@@ -2204,7 +2321,9 @@ typedef $$FinancialRecordsTableUpdateCompanionBuilder =
     FinancialRecordsCompanion Function({
       Value<int> id,
       Value<String> reference,
+      Value<String?> sourceMessageId,
       Value<DateTime?> transactionDate,
+      Value<DateTime> receivedAt,
       Value<double> amount,
       Value<double?> balance,
       Value<double?> transactionCost,
@@ -2242,8 +2361,18 @@ class $$FinancialRecordsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get sourceMessageId => $composableBuilder(
+    column: $table.sourceMessageId,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<DateTime> get transactionDate => $composableBuilder(
     column: $table.transactionDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get receivedAt => $composableBuilder(
+    column: $table.receivedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2347,8 +2476,18 @@ class $$FinancialRecordsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get sourceMessageId => $composableBuilder(
+    column: $table.sourceMessageId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get transactionDate => $composableBuilder(
     column: $table.transactionDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get receivedAt => $composableBuilder(
+    column: $table.receivedAt,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -2448,8 +2587,18 @@ class $$FinancialRecordsTableAnnotationComposer
   GeneratedColumn<String> get reference =>
       $composableBuilder(column: $table.reference, builder: (column) => column);
 
+  GeneratedColumn<String> get sourceMessageId => $composableBuilder(
+    column: $table.sourceMessageId,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get transactionDate => $composableBuilder(
     column: $table.transactionDate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get receivedAt => $composableBuilder(
+    column: $table.receivedAt,
     builder: (column) => column,
   );
 
@@ -2555,7 +2704,9 @@ class $$FinancialRecordsTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<String> reference = const Value.absent(),
+                Value<String?> sourceMessageId = const Value.absent(),
                 Value<DateTime?> transactionDate = const Value.absent(),
+                Value<DateTime> receivedAt = const Value.absent(),
                 Value<double> amount = const Value.absent(),
                 Value<double?> balance = const Value.absent(),
                 Value<double?> transactionCost = const Value.absent(),
@@ -2575,7 +2726,9 @@ class $$FinancialRecordsTableTableManager
               }) => FinancialRecordsCompanion(
                 id: id,
                 reference: reference,
+                sourceMessageId: sourceMessageId,
                 transactionDate: transactionDate,
+                receivedAt: receivedAt,
                 amount: amount,
                 balance: balance,
                 transactionCost: transactionCost,
@@ -2597,7 +2750,9 @@ class $$FinancialRecordsTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 required String reference,
+                Value<String?> sourceMessageId = const Value.absent(),
                 Value<DateTime?> transactionDate = const Value.absent(),
+                required DateTime receivedAt,
                 required double amount,
                 Value<double?> balance = const Value.absent(),
                 Value<double?> transactionCost = const Value.absent(),
@@ -2617,7 +2772,9 @@ class $$FinancialRecordsTableTableManager
               }) => FinancialRecordsCompanion.insert(
                 id: id,
                 reference: reference,
+                sourceMessageId: sourceMessageId,
                 transactionDate: transactionDate,
+                receivedAt: receivedAt,
                 amount: amount,
                 balance: balance,
                 transactionCost: transactionCost,

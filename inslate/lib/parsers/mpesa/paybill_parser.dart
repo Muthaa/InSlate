@@ -32,6 +32,8 @@ class PayBillParser implements Parser {
         classification: classification,
         title: RecordTitles.payBill,
         rawMessage: message.body,
+        sourceMessageId: message.id,
+        receivedAt: message.receivedAt,
         party: party,
       );
 

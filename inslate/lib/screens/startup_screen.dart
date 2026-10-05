@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/app_preferences_provider.dart';
-import 'dashboard/dashboard_screen.dart';
+import 'app_shell.dart';
 import 'onboarding/welcome_screen.dart';
 
 class StartupScreen extends ConsumerWidget {
@@ -73,7 +73,7 @@ class StartupScreen extends ConsumerWidget {
       ),
       data: (preferences) {
         if (preferences.onboardingCompleted) {
-          return const DashboardScreen();
+          return const AppShell();
         }
 
         return const WelcomeScreen();

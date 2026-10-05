@@ -20,6 +20,13 @@ class RawMessagesDao extends DatabaseAccessor<AppDatabase>
     return select(rawMessages).get();
   }
 
+  Future<RawMessage?> getLatestMessage() {
+    return (select(rawMessages)
+          ..orderBy([(message) => OrderingTerm.desc(message.receivedAt)])
+          ..limit(1))
+        .getSingleOrNull();
+  }
+
   Future<int> insertMessage(RawMessagesCompanion message) {
     return into(rawMessages).insert(message);
   }
@@ -39,6 +46,31 @@ class RawMessagesDao extends DatabaseAccessor<AppDatabase>
     )..where((message) => message.sourceId.isIn(sourceIds))).get();
 
     return rows.map((row) => row.sourceId).toList();
+  }
+
+  Future<List<RawMessage>> getBySenderAndBodies(
+    Map<String, List<String>> bodiesBySender,
+  ) async {
+    final matches = <RawMessage>[];
+
+    for (final entry in bodiesBySender.entries) {
+      final bodies = entry.value;
+
+      for (var start = 0; start < bodies.length; start += 500) {
+        final bodyChunk = bodies.skip(start).take(500).toList();
+        final rows =
+            await (select(rawMessages)..where(
+                  (message) =>
+                      message.sender.equals(entry.key) &
+                      message.body.isIn(bodyChunk),
+                ))
+                .get();
+
+        matches.addAll(rows);
+      }
+    }
+
+    return matches;
   }
 
   Future<void> insertMessages(List<RawMessagesCompanion> messages) async {

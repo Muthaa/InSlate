@@ -60,10 +60,10 @@ void main() {
 
       await repository.save(record);
 
-      final saved = await repository.getByReference('UFQNY935Z8');
+      final savedRecords = await repository.getAllByReference('UFQNY935Z8');
+      final saved = savedRecords.single;
 
-      expect(saved, isNotNull);
-      expect(saved!.reference, 'UFQNY935Z8');
+      expect(saved.reference, 'UFQNY935Z8');
       expect(saved.amount, 613.00);
       expect(saved.transactionCost, 6.13);
       expect(saved.balance, isNull);

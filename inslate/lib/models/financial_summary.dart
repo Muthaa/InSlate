@@ -37,6 +37,16 @@ class FinancialSummary {
   final int expensePartyCount;
   final int incomePartyCount;
 
+  final double? totalLoansBorrowed;
+  final double? totalLoanRepayments;
+  final int? loanBorrowingTransactionCount;
+  final int? loanRepaymentTransactionCount;
+
+  final double totalInvested;
+  final double totalInvestmentWithdrawals;
+  final int investmentTransactionCount;
+  final int investmentWithdrawalTransactionCount;
+
   const FinancialSummary({
     required this.period,
     required this.currentBalance,
@@ -62,5 +72,14 @@ class FinancialSummary {
     required this.topIncome,
     required this.expensePartyCount,
     required this.incomePartyCount,
+    this.totalLoansBorrowed = 0,
+    this.totalLoanRepayments = 0,
+    this.loanBorrowingTransactionCount = 0,
+    this.loanRepaymentTransactionCount = 0,
+
+    this.totalInvested = 0,
+    this.totalInvestmentWithdrawals = 0,
+    this.investmentTransactionCount = 0,
+    this.investmentWithdrawalTransactionCount = 0,
   });
 }

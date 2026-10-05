@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
+import 'category_transactions_screen.dart';
 import '../../core/enums/record_subtype.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/financial_records.dart';
@@ -18,6 +18,7 @@ class DashboardScreen extends ConsumerWidget {
     final summary = ref.watch(financialSummaryProvider);
 
     return Scaffold(
+      backgroundColor: AppTheme.appBackground,
       body: SafeArea(
         top: false,
         child: summary.when(
@@ -85,6 +86,12 @@ class _DashboardContent extends StatelessWidget {
                     : summary.totalReceived / summary.incomeTransactionCount,
               ),
               const SizedBox(height: 16),
+              _LoansCard(summary: summary),
+              const SizedBox(height: 16),
+
+              _InvestmentsCard(summary: summary),
+              const SizedBox(height: 16),
+
               _ActivityCard(transactions: summary.recentTransactions),
             ]),
           ),
@@ -196,7 +203,7 @@ class _DashboardHeader extends StatelessWidget {
           ),
           IconButton(
             onPressed: () {},
-            icon: const Icon(Icons.more_horiz_rounded, color: Colors.white),
+            icon: const Icon(Icons.insights, color: Colors.white),
           ),
         ],
       ),
@@ -472,8 +479,22 @@ class _OverviewCard extends StatelessWidget {
             ..._sortedCategories(summary.spendingBySubtype)
                 .take(4)
                 .map(
-                  (entry) =>
-                      _CategoryRow(subtype: entry.key, amount: entry.value),
+                  (entry) => _CategoryRow(
+                    subtype: entry.key,
+                    amount: entry.value,
+                    total: summary.totalExpenses,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => CategoryTransactionsScreen(
+                            subtype: entry.key,
+                            isIncome: false,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
           ],
 
@@ -487,7 +508,19 @@ class _OverviewCard extends StatelessWidget {
                   (entry) => _CategoryRow(
                     subtype: entry.key,
                     amount: entry.value,
+                    total: summary.totalIncome,
                     isIncome: true,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => CategoryTransactionsScreen(
+                            subtype: entry.key,
+                            isIncome: true,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
           ],
@@ -572,50 +605,103 @@ class _SubsectionTitle extends StatelessWidget {
 class _CategoryRow extends StatelessWidget {
   final RecordSubtype subtype;
   final double amount;
+  final double total;
   final bool isIncome;
+  final VoidCallback? onTap;
 
   const _CategoryRow({
     required this.subtype,
     required this.amount,
+    required this.total,
     this.isIncome = false,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 9),
-      child: Row(
-        children: [
-          Container(
-            width: 7,
-            height: 7,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isIncome
-                  ? const Color(0xFF0F9D8A)
-                  : const Color(0xFF0B1F3A),
+    final percentage = total <= 0 ? 0.0 : amount / total;
+
+    final accentColor = isIncome
+        ? const Color(0xFF0F9D8A)
+        : const Color(0xFFD95C5C);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: accentColor,
+                  ),
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    _subtypeLabel(subtype),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: const Color(0xFF0B1F3A),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Text(
+                  _money(amount),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: isIncome
+                        ? const Color(0xFF0F9D8A)
+                        : const Color(0xFFD95C5C),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 19,
+                  color: Colors.grey.shade400,
+                ),
+              ],
             ),
-          ),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Text(
-              _subtypeLabel(subtype),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: Colors.grey.shade700,
-                fontWeight: FontWeight.w600,
-              ),
+            const SizedBox(height: 7),
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: LinearProgressIndicator(
+                      value: percentage,
+                      minHeight: 5,
+                      backgroundColor: const Color(0xFFEFF2F3),
+                      color: accentColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 9),
+                SizedBox(
+                  width: 38,
+                  child: Text(
+                    '${(percentage * 100).toStringAsFixed(0)}%',
+                    textAlign: TextAlign.right,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: Colors.grey.shade500,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-          Text(
-            _money(amount),
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: const Color(0xFF0B1F3A),
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -783,6 +869,7 @@ class _PartyRow extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodyMedium?.copyWith(
+                    fontSize: 13,
                     color: const Color(0xFF0B1F3A),
                     fontWeight: FontWeight.w500,
                   ),
@@ -1005,6 +1092,340 @@ class _DashboardCard extends StatelessWidget {
         border: Border.all(color: const Color(0xFFE9EEF0)),
       ),
       child: child,
+    );
+  }
+}
+
+class _LoansCard extends StatelessWidget {
+  final FinancialSummary summary;
+
+  const _LoansCard({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: colors.primary.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.account_balance_rounded,
+                    color: colors.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Loans',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: colors.secondary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Fuliza activity this month',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: colors.onSurfaceVariant,
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+
+            Row(
+              children: [
+                Expanded(
+                  child: _LoanMetric(
+                    label: 'Borrowed',
+                    amount: summary.totalLoansBorrowed ?? 0,
+                    transactionCount:
+                        summary.loanBorrowingTransactionCount ?? 0,
+                    color: colors.error,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _LoanMetric(
+                    label: 'Repaid',
+                    amount: summary.totalLoanRepayments ?? 0,
+                    transactionCount:
+                        summary.loanRepaymentTransactionCount ?? 0,
+                    color: colors.primary,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () {},
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: colors.primary,
+                  side: BorderSide(
+                    color: colors.primary.withValues(alpha: 0.35),
+                  ),
+                  minimumSize: const Size(0, 44),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text('View loan activity'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LoanMetric extends StatelessWidget {
+  final String label;
+  final double amount;
+  final int transactionCount;
+  final Color color;
+
+  const _LoanMetric({
+    required this.label,
+    required this.amount,
+    required this.transactionCount,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'KSh ${amount.toStringAsFixed(0)}',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            '$transactionCount ${transactionCount == 1 ? 'transaction' : 'transactions'}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InvestmentsCard extends StatelessWidget {
+  final FinancialSummary summary;
+
+  const _InvestmentsCard({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: colors.primary.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.savings_outlined, color: colors.primary),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Investments & Savings',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: colors.secondary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Investment activity this month',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: colors.onSurfaceVariant,
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: _InvestmentMetric(
+                    label: 'Invested',
+                    amount: summary.totalInvested,
+                    transactionCount: summary.investmentTransactionCount,
+                    icon: Icons.trending_up_rounded,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _InvestmentMetric(
+                    label: 'Withdrawn',
+                    amount: summary.totalInvestmentWithdrawals,
+                    transactionCount:
+                        summary.investmentWithdrawalTransactionCount,
+                    icon: Icons.south_west_rounded,
+                    amountColor: colors.error,
+                    backgroundColor: colors.error,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () {},
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: colors.primary,
+                  side: BorderSide(
+                    color: colors.primary.withValues(alpha: 0.35),
+                  ),
+                  minimumSize: const Size(0, 44),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text('View investment activity'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InvestmentMetric extends StatelessWidget {
+  final String label;
+  final double amount;
+  final int transactionCount;
+  final IconData icon;
+  final Color? amountColor;
+  final Color? backgroundColor;
+
+  const _InvestmentMetric({
+    required this.label,
+    required this.amount,
+    required this.transactionCount,
+    required this.icon,
+    this.amountColor,
+    this.backgroundColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.primary;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: (backgroundColor ?? color).withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _money(amount),
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: amountColor ?? color,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            '$transactionCount '
+            '${transactionCount == 1 ? 'transaction' : 'transactions'}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

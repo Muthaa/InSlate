@@ -29,6 +29,7 @@ void main() {
     final original = domain.FinancialRecord(
       reference: reference,
       transactionDate: DateTime(2026, 9, 14, 11, 30),
+      receivedAt: DateTime(2026, 9, 14, 11, 30),
       amount: 1500.0,
       balance: 8500.0,
       type: FinancialRecordType.expense,
@@ -48,11 +49,10 @@ void main() {
 
     await repository.save(original);
 
-    final retrieved = await repository.getByReference(reference);
+    final retrievedRecords = await repository.getAllByReference(reference);
+    final retrieved = retrievedRecords.single;
 
-    expect(retrieved != null, true);
-
-    expect(retrieved!.reference, original.reference);
+    expect(retrieved.reference, original.reference);
     expect(retrieved.transactionDate, original.transactionDate);
     expect(retrieved.amount, original.amount);
     expect(retrieved.balance, original.balance);

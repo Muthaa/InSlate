@@ -32,6 +32,8 @@ class FinancialRecordTypeMapper {
       // Loan subtypes
       case RecordSubtype.fulizaLoan:
       case RecordSubtype.fulizaRepayment:
+      case RecordSubtype.loanDisbursement:
+      case RecordSubtype.loanRepayment:
         return FinancialRecordType.loan;
 
       default:

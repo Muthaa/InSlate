@@ -18,6 +18,7 @@ class FinancialRecordsRepository {
       FinancialRecordsCompanion.insert(
         reference: record.reference,
         transactionDate: Value(record.transactionDate),
+        receivedAt: record.receivedAt,
         amount: record.amount,
         balance: Value(record.balance),
         transactionCost: Value(record.transactionCost),
@@ -26,6 +27,7 @@ class FinancialRecordsRepository {
         status: record.status.name,
         title: record.title,
         rawMessage: record.rawMessage,
+        sourceMessageId: Value(record.sourceMessageId),
         partyName: Value(record.party?.name),
         partyType: Value(record.party?.type.name),
         partyPhone: Value(record.party?.phone),
@@ -39,6 +41,14 @@ class FinancialRecordsRepository {
     return database.financialRecordsDao.getExistingReferences(references);
   }
 
+  Future<List<String>> getExistingSourceMessageIds(
+    List<String> sourceMessageIds,
+  ) {
+    return database.financialRecordsDao.getExistingSourceMessageIds(
+      sourceMessageIds,
+    );
+  }
+
   Future<void> saveAll(List<domain.FinancialRecord> records) async {
     if (records.isEmpty) {
       return;
@@ -50,6 +60,7 @@ class FinancialRecordsRepository {
             (record) => FinancialRecordsCompanion.insert(
               reference: record.reference,
               transactionDate: Value(record.transactionDate),
+              receivedAt: record.receivedAt,
               amount: record.amount,
               balance: Value(record.balance),
               transactionCost: Value(record.transactionCost),
@@ -58,6 +69,7 @@ class FinancialRecordsRepository {
               status: record.status.name,
               title: record.title,
               rawMessage: record.rawMessage,
+              sourceMessageId: Value(record.sourceMessageId),
               partyName: Value(record.party?.name),
               partyType: Value(record.party?.type.name),
               partyPhone: Value(record.party?.phone),
@@ -69,16 +81,14 @@ class FinancialRecordsRepository {
     );
   }
 
-  Future<domain.FinancialRecord?> getByReference(String reference) async {
-    final row = await database.financialRecordsDao.getRecordByReference(
+  Future<List<domain.FinancialRecord>> getAllByReference(
+    String reference,
+  ) async {
+    final rows = await database.financialRecordsDao.getRecordsByReference(
       reference,
     );
 
-    if (row == null) {
-      return null;
-    }
-
-    return _toDomain(row);
+    return rows.map(_toDomain).toList();
   }
 
   Future<List<domain.FinancialRecord>> getAll() async {
@@ -99,6 +109,8 @@ class FinancialRecordsRepository {
       title: row.title,
       transactionCost: row.transactionCost ?? 0,
       rawMessage: row.rawMessage,
+      receivedAt: row.receivedAt,
+      sourceMessageId: row.sourceMessageId,
       party: _buildParty(row),
     );
   }
