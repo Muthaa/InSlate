@@ -22,7 +22,7 @@ void main() {
     final original = domain.RawMessage(
       id: 'SMS-REPO-001',
       sender: 'MPESA',
-      body: 'UFSNY9B1NP Confirmed. Ksh300.00 sent to VIVIAN  KARANI',
+      body: 'UFSNY9B1NP Confirmed. Ksh300.00 sent to TEST USER',
       receivedAt: DateTime(2026, 6, 28, 11, 47),
     );
 

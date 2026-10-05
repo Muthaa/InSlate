@@ -65,7 +65,7 @@ void main() {
     () {
       const body =
           'UJ38B91CKT Confirmed.You have received Ksh1,000.00 from '
-          'ESTHER MUTHANGYA 0711***811 on 3/10/26 at 6:25 AM '
+          'TEST USER 0700***000 on 3/10/26 at 6:25 AM '
           'New M-PESA balance is Ksh1,000.00. '
           'Invest & earn daily interest with ZIIDI on https://saf.cx/cF6ir';
 

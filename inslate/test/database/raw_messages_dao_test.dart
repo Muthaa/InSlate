@@ -20,7 +20,7 @@ void main() {
     final message = RawMessagesCompanion.insert(
       sourceId: sourceId,
       sender: 'MPESA',
-      body: 'UFSNY9B1NP Confirmed. Ksh300.00 sent to VIVIAN  KARANI',
+      body: 'UFSNY9B1NP Confirmed. Ksh300.00 sent to TEST USER',
       receivedAt: DateTime(2026, 6, 28, 11, 47),
     );
 
@@ -34,7 +34,7 @@ void main() {
     expect(retrieved.sender, 'MPESA');
     expect(
       retrieved.body,
-      'UFSNY9B1NP Confirmed. Ksh300.00 sent to VIVIAN  KARANI',
+      'UFSNY9B1NP Confirmed. Ksh300.00 sent to TEST USER',
     );
     expect(retrieved.receivedAt, DateTime(2026, 6, 28, 11, 47));
   });

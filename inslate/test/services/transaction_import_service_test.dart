@@ -89,8 +89,8 @@ void main() {
       id: 'SMS-001',
       sender: 'MPESA',
       body:
-          'UFSNY9B1NP Confirmed. Ksh300.00 sent to VIVIAN  KARANI '
-          '0707855891 on 28/6/26 at 11:47 AM. New M-PESA balance is '
+          'UFSNY9B1NP Confirmed. Ksh300.00 sent to TEST USER '
+          '0700000000 on 28/6/26 at 11:47 AM. New M-PESA balance is '
           'Ksh3,281.24. Transaction cost, Ksh7.00. Amount you can '
           'transact within the day is 487,380.00. Download My OneApp on',
       receivedAt: DateTime(2026, 6, 28, 11, 47),
@@ -114,8 +114,8 @@ void main() {
     expect(record.sourceMessageId, message.id);
 
     expect(record.party != null, true);
-    expect(record.party!.name, 'VIVIAN  KARANI');
-    expect(record.party!.phone, '0707855891');
+    expect(record.party!.name, 'TEST USER');
+    expect(record.party!.phone, '0700000000');
   });
 
   test(
@@ -126,8 +126,8 @@ void main() {
         id: 'SMS-SHARED-REFERENCE-SEND',
         sender: 'MPESA',
         body:
-            '$reference Confirmed. Ksh300.00 sent to VIVIAN  KARANI '
-            '0707855891 on 28/6/26 at 11:47 AM. New M-PESA balance is '
+            '$reference Confirmed. Ksh300.00 sent to TEST USER '
+            '0700000000 on 28/6/26 at 11:47 AM. New M-PESA balance is '
             'Ksh3,281.24. Transaction cost, Ksh7.00. Amount you can '
             'transact within the day is 487,380.00. Download My OneApp on',
         receivedAt: DateTime(2026, 6, 28, 11, 47),
@@ -173,8 +173,8 @@ void main() {
     'skips same-sender identical bodies with different source IDs',
     () async {
       const body =
-          'UFSNY9B1NP Confirmed. Ksh300.00 sent to VIVIAN  KARANI '
-          '0707855891 on 28/6/26 at 11:47 AM. New M-PESA balance is '
+          'UFSNY9B1NP Confirmed. Ksh300.00 sent to TEST USER '
+          '0700000000 on 28/6/26 at 11:47 AM. New M-PESA balance is '
           'Ksh3,281.24. Transaction cost, Ksh7.00. Amount you can '
           'transact within the day is 487,380.00. Download My OneApp on';
       final firstMessage = domain.RawMessage(
@@ -211,8 +211,8 @@ void main() {
       id: 'SMS-DIFFERENT-BODY-FIRST',
       sender: 'MPESA',
       body:
-          'UFSNY9B1NP Confirmed. Ksh300.00 sent to VIVIAN  KARANI '
-          '0707855891 on 28/6/26 at 11:47 AM. New M-PESA balance is '
+          'UFSNY9B1NP Confirmed. Ksh300.00 sent to TEST USER '
+          '0700000000 on 28/6/26 at 11:47 AM. New M-PESA balance is '
           'Ksh3,281.24. Transaction cost, Ksh7.00. Amount you can '
           'transact within the day is 487,380.00. Download My OneApp on',
       receivedAt: DateTime(2026, 6, 28, 11, 47),
@@ -221,8 +221,8 @@ void main() {
       id: 'SMS-DIFFERENT-BODY-SECOND',
       sender: 'MPESA',
       body:
-          'UFSNY9B1NP Confirmed. Ksh200.00 sent to JOHN DOE '
-          '0712345678 on 28/6/26 at 11:49 AM. New M-PESA balance is '
+          'UFSNY9B1NP Confirmed. Ksh200.00 sent to TEST USER '
+          '0700000001 on 28/6/26 at 11:49 AM. New M-PESA balance is '
           'Ksh3,074.24. Transaction cost, Ksh7.00. Amount you can '
           'transact within the day is 487,180.00. Download My OneApp on',
       receivedAt: DateTime(2026, 6, 28, 11, 49),
@@ -242,8 +242,8 @@ void main() {
 
   test('imports identical bodies from different senders', () async {
     const body =
-        'UFSNY9B1NP Confirmed. Ksh300.00 sent to VIVIAN  KARANI '
-        '0707855891 on 28/6/26 at 11:47 AM. New M-PESA balance is '
+        'UFSNY9B1NP Confirmed. Ksh300.00 sent to TEST USER '
+        '0700000000 on 28/6/26 at 11:47 AM. New M-PESA balance is '
         'Ksh3,281.24. Transaction cost, Ksh7.00. Amount you can '
         'transact within the day is 487,380.00. Download My OneApp on';
     final firstMessage = domain.RawMessage(
@@ -273,8 +273,8 @@ void main() {
 
   test('skips exact SMS already stored with a different source ID', () async {
     const body =
-        'UFSNY9B1NP Confirmed. Ksh300.00 sent to VIVIAN  KARANI '
-        '0707855891 on 28/6/26 at 11:47 AM. New M-PESA balance is '
+        'UFSNY9B1NP Confirmed. Ksh300.00 sent to TEST USER '
+        '0700000000 on 28/6/26 at 11:47 AM. New M-PESA balance is '
         'Ksh3,281.24. Transaction cost, Ksh7.00. Amount you can '
         'transact within the day is 487,380.00. Download My OneApp on';
     final storedMessage = domain.RawMessage(
@@ -308,8 +308,8 @@ void main() {
       id: 'SMS-DUPLICATE-001',
       sender: 'MPESA',
       body:
-          'UFSNY9B1NP Confirmed. Ksh300.00 sent to VIVIAN  KARANI '
-          '0707855891 on 28/6/26 at 11:47 AM. New M-PESA balance is '
+          'UFSNY9B1NP Confirmed. Ksh300.00 sent to TEST USER '
+          '0700000000 on 28/6/26 at 11:47 AM. New M-PESA balance is '
           'Ksh3,281.24. Transaction cost, Ksh7.00. Amount you can '
           'transact within the day is 487,380.00. Download My OneApp on',
       receivedAt: DateTime(2026, 6, 28, 11, 47),
@@ -347,8 +347,8 @@ void main() {
       id: 'SMS-BATCH-VALID',
       sender: 'MPESA',
       body:
-          'UFSNY9B1NP Confirmed. Ksh300.00 sent to VIVIAN  KARANI '
-          '0707855891 on 28/6/26 at 11:47 AM. New M-PESA balance is '
+          'UFSNY9B1NP Confirmed. Ksh300.00 sent to TEST USER '
+          '0700000000 on 28/6/26 at 11:47 AM. New M-PESA balance is '
           'Ksh3,281.24. Transaction cost, Ksh7.00. Amount you can '
           'transact within the day is 487,380.00. Download My OneApp on',
       receivedAt: DateTime(2026, 6, 28, 11, 47),
@@ -393,8 +393,8 @@ void main() {
         id: 'SMS-BATCH-AFTER-FAIL',
         sender: 'MPESA',
         body:
-            'UFSNY9B1NP Confirmed. Ksh300.00 sent to VIVIAN  KARANI '
-            '0707855891 on 28/6/26 at 11:47 AM. New M-PESA balance is '
+            'UFSNY9B1NP Confirmed. Ksh300.00 sent to TEST USER '
+            '0700000000 on 28/6/26 at 11:47 AM. New M-PESA balance is '
             'Ksh3,281.24. Transaction cost, Ksh7.00. Amount you can '
             'transact within the day is 487,380.00. Download My OneApp on',
         receivedAt: DateTime(2026, 6, 28, 11, 48),
@@ -480,7 +480,7 @@ void main() {
       id: 'source-test-1',
       sender: 'MPESA',
       body: '''
-UFSNY9B1NP Confirmed. Ksh300.00 sent to VIVIAN  KARANI 0707855891 on 28/6/26 at 11:47 AM. New M-PESA balance is Ksh3,281.24. Transaction cost, Ksh7.00. Amount you can transact within the day is 487,380.00. Download My OneApp on
+UFSNY9B1NP Confirmed. Ksh300.00 sent to TEST USER 0700000000 on 28/6/26 at 11:47 AM. New M-PESA balance is Ksh3,281.24. Transaction cost, Ksh7.00. Amount you can transact within the day is 487,380.00. Download My OneApp on
 ''',
       receivedAt: DateTime(2026, 6, 28, 11, 47),
     );

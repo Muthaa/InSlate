@@ -39,9 +39,9 @@ void main() {
       transactionCost: 15.0,
       rawMessage: 'Test M-PESA message',
       party: const Party(
-        name: 'John Doe',
+        name: 'Test User',
         type: PartyType.person,
-        phone: '0712345678',
+        phone: '0700000000',
         account: null,
         identifier: 'PERSON-001',
       ),
@@ -64,9 +64,9 @@ void main() {
     expect(retrieved.rawMessage, original.rawMessage);
 
     expect(retrieved.party != null, true);
-    expect(retrieved.party!.name, 'John Doe');
+    expect(retrieved.party!.name, 'Test User');
     expect(retrieved.party!.type, PartyType.person);
-    expect(retrieved.party!.phone, '0712345678');
+    expect(retrieved.party!.phone, '0700000000');
     expect(retrieved.party!.identifier, 'PERSON-001');
   });
 }
