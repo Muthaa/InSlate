@@ -1,13 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'category_transactions_screen.dart';
-import '../../core/enums/record_subtype.dart';
+import 'financial_breakdown_screen.dart';
+import '../activity/activity_screen.dart';
+import '../../models/activity_filter.dart';
+import '../../models/financial_breakdown.dart';
+import '../../services/financial_breakdown_service.dart';
+import '../../core/presentation/financial_presentation.dart';
+import '../../widgets/financial_group_row.dart';
+import '../../widgets/transaction_row.dart';
+import '../../providers/dashboard_provider.dart';
+import '../../providers/financial_summary_provider.dart';
+import '../../models/financial_period.dart';
+
 import '../../core/theme/app_theme.dart';
 import '../../models/financial_records.dart';
-import '../../models/financial_summary.dart';
-import '../../models/party.dart';
-import '../../models/party_summary.dart';
-import '../../providers/financial_summary_provider.dart';
+
 import 'widgets/month_selector.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -15,98 +22,206 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final summary = ref.watch(financialSummaryProvider);
+    final summary = ref.watch(dashboardSummaryProvider);
+    final period = FinancialPeriod.month(ref.watch(selectedMonthProvider));
 
     return Scaffold(
       backgroundColor: AppTheme.appBackground,
       body: SafeArea(
         top: false,
-        child: summary.when(
-          skipLoadingOnReload: true,
-          skipLoadingOnRefresh: true,
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, stack) => _ErrorState(
-            onRetry: () {
-              ref.invalidate(financialSummaryProvider);
-            },
-          ),
-          data: (summary) {
-            return _DashboardContent(summary: summary);
-          },
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _DashboardStickyHeaderDelegate(
+                height: _DashboardHeader.stickyExtent(context),
+              ),
+            ),
+            summary.when(
+              skipLoadingOnReload: true,
+              skipLoadingOnRefresh: true,
+              loading: () => const _DashboardPeriodLoading(),
+              error: (error, stack) => SliverFillRemaining(
+                hasScrollBody: false,
+                child: _ErrorState(
+                  onRetry: () => ref.invalidate(periodRecordsProvider(period)),
+                ),
+              ),
+              data: (summary) {
+                return _DashboardPendingValues(
+                  pending: summary.period != period,
+                  child: SliverIgnorePointer(
+                    ignoring: summary.period != period,
+                    sliver: _DashboardContent(summary: summary),
+                  ),
+                );
+              },
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _DashboardContent extends StatelessWidget {
-  final FinancialSummary summary;
+class _DashboardPendingValues extends InheritedWidget {
+  final bool pending;
+  const _DashboardPendingValues({required this.pending, required super.child});
+  static bool of(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<_DashboardPendingValues>()
+          ?.pending ??
+      false;
+  @override
+  bool updateShouldNotify(_DashboardPendingValues oldWidget) =>
+      pending != oldWidget.pending;
+}
 
+class _PeriodDataVisibility extends StatelessWidget {
+  final Widget child;
+  const _PeriodDataVisibility({required this.child});
+  @override
+  Widget build(BuildContext context) => Visibility(
+    visible: !_DashboardPendingValues.of(context),
+    maintainState: true,
+    maintainAnimation: true,
+    maintainSize: true,
+    child: child,
+  );
+}
+
+class _DashboardPeriodLoading extends StatelessWidget {
+  const _DashboardPeriodLoading();
+
+  @override
+  Widget build(BuildContext context) => const SliverFillRemaining(
+    hasScrollBody: false,
+    child: Center(child: Text('Loading this period…')),
+  );
+}
+
+class _DashboardContent extends StatelessWidget {
+  final DashboardSummary summary;
   const _DashboardContent({required this.summary});
 
   @override
   Widget build(BuildContext context) {
-    return CustomScrollView(
-      physics: const BouncingScrollPhysics(),
-      slivers: [
-        SliverPersistentHeader(
-          pinned: true,
-          delegate: _DashboardStickyHeaderDelegate(),
-        ),
-
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
-          sliver: SliverList(
-            delegate: SliverChildListDelegate([
-              _MoneyMovementCard(summary: summary),
-              const SizedBox(height: 16),
-              _OverviewCard(summary: summary),
-              const SizedBox(height: 16),
-              _TopPartyCard(
-                title: 'Top expenses',
-                subtitle: 'People and businesses you sent the most to',
-                parties: summary.topExpenses,
-                isExpense: true,
-                partyCount: summary.expensePartyCount,
-                transactionCount: summary.expenseTransactionCount,
-                averageTransaction: summary.expenseTransactionCount == 0
-                    ? 0
-                    : summary.totalSent / summary.expenseTransactionCount,
-              ),
-              const SizedBox(height: 16),
-              _TopPartyCard(
-                title: 'Top income',
-                subtitle: 'People and businesses you received the most from',
-                parties: summary.topIncome,
-                isExpense: false,
-                partyCount: summary.incomePartyCount,
-                transactionCount: summary.incomeTransactionCount,
-                averageTransaction: summary.incomeTransactionCount == 0
-                    ? 0
-                    : summary.totalReceived / summary.incomeTransactionCount,
-              ),
-              const SizedBox(height: 16),
-              _LoansCard(summary: summary),
-              const SizedBox(height: 16),
-
-              _InvestmentsCard(summary: summary),
-              const SizedBox(height: 16),
-
-              _ActivityCard(transactions: summary.recentTransactions),
-            ]),
+    final now = DateTime.now();
+    final showRecent =
+        summary.period.start.year == now.year &&
+        summary.period.start.month == now.month;
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
+      sliver: SliverList(
+        delegate: SliverChildListDelegate([
+          _MoneyMovementCard(summary: summary),
+          const SizedBox(height: 16),
+          _OverviewCard(summary: summary),
+          const SizedBox(height: 16),
+          _CategorySummaryCard(
+            summary: summary,
+            kind: BreakdownKind.spending,
+            title: 'Expense categories',
+            icon: Icons.pie_chart_outline_rounded,
           ),
-        ),
-      ],
+          const SizedBox(height: 16),
+          _CategorySummaryCard(
+            summary: summary,
+            kind: BreakdownKind.incomeCategories,
+            title: 'Income categories',
+            icon: Icons.south_west_rounded,
+          ),
+          const SizedBox(height: 16),
+          _TopPartyCard(
+            title: 'Top expenses',
+            subtitle: 'People and businesses you sent the most to',
+            parties: summary
+                .breakdown(BreakdownKind.expenseParties)
+                .groups
+                .take(5)
+                .toList(),
+            isExpense: true,
+            partyCount: summary
+                .breakdown(BreakdownKind.expenseParties)
+                .groups
+                .where((group) => group.filter.party != null)
+                .length,
+            transactionCount: summary
+                .breakdown(BreakdownKind.expenseParties)
+                .count,
+            averageTransaction:
+                summary.breakdown(BreakdownKind.expenseParties).count == 0
+                ? 0
+                : summary.breakdown(BreakdownKind.expenseParties).amount /
+                      summary.breakdown(BreakdownKind.expenseParties).count,
+            onOpen: () =>
+                _openBreakdown(context, summary, BreakdownKind.expenseParties),
+          ),
+          const SizedBox(height: 16),
+          _TopPartyCard(
+            title: 'Top income',
+            subtitle: 'People and businesses you received the most from',
+            parties: summary
+                .breakdown(BreakdownKind.incomeParties)
+                .groups
+                .take(5)
+                .toList(),
+            isExpense: false,
+            partyCount: summary
+                .breakdown(BreakdownKind.incomeParties)
+                .groups
+                .where((group) => group.filter.party != null)
+                .length,
+            transactionCount: summary
+                .breakdown(BreakdownKind.incomeParties)
+                .count,
+            averageTransaction:
+                summary.breakdown(BreakdownKind.incomeParties).count == 0
+                ? 0
+                : summary.breakdown(BreakdownKind.incomeParties).amount /
+                      summary.breakdown(BreakdownKind.incomeParties).count,
+            onOpen: () =>
+                _openBreakdown(context, summary, BreakdownKind.incomeParties),
+          ),
+          const SizedBox(height: 16),
+          _AccountActivityCard(
+            summary: summary,
+            kind: BreakdownKind.loans,
+            title: 'Loans',
+            icon: Icons.account_balance_rounded,
+            action: 'View loan breakdown',
+          ),
+          const SizedBox(height: 16),
+          _AccountActivityCard(
+            summary: summary,
+            kind: BreakdownKind.investmentsAndSavings,
+            title: 'Investments & Savings',
+            icon: Icons.savings_outlined,
+            action: 'View savings & investments',
+          ),
+          if (showRecent) ...[
+            const SizedBox(height: 16),
+            _ActivityCard(
+              transactions: summary.recent,
+              filter: ActivityFilter(period: summary.period),
+            ),
+          ],
+        ]),
+      ),
     );
   }
 }
 
 class _DashboardStickyHeaderDelegate extends SliverPersistentHeaderDelegate {
-  @override
-  double get minExtent => 232;
+  final double height;
+  _DashboardStickyHeaderDelegate({required this.height});
 
   @override
-  double get maxExtent => 232;
+  double get minExtent => height;
+
+  @override
+  double get maxExtent => height;
 
   @override
   Widget build(
@@ -119,7 +234,6 @@ class _DashboardStickyHeaderDelegate extends SliverPersistentHeaderDelegate {
       child: Column(
         children: [
           const _DashboardHeader(),
-
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
             child: const MonthSelector(),
@@ -131,12 +245,45 @@ class _DashboardStickyHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(covariant _DashboardStickyHeaderDelegate oldDelegate) {
-    return false;
+    return oldDelegate.height != height;
   }
 }
 
 class _DashboardHeader extends StatelessWidget {
   const _DashboardHeader();
+
+  // Keep the top section compact, allowing its header text to wrap without
+  // clipping at narrow widths or larger accessibility text sizes.
+  static double stickyExtent(BuildContext context) {
+    final theme = Theme.of(context);
+    final textWidth = MediaQuery.sizeOf(context).width - 36 - 48 - 12 - 48;
+    double textHeight(String text, TextStyle? style) {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: style),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout(maxWidth: textWidth > 0 ? textWidth : 1);
+      final height = painter.height;
+      painter.dispose();
+      return height;
+    }
+
+    final titleHeight = textHeight(
+      'InSlate',
+      theme.textTheme.titleLarge?.copyWith(
+        fontWeight: FontWeight.w800,
+        letterSpacing: -0.4,
+      ),
+    );
+    final subtitleHeight = textHeight(
+      'Financial intelligence',
+      theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+    );
+    final extraHeight = titleHeight + 2 + subtitleHeight - 48;
+    return 200 +
+        MediaQuery.paddingOf(context).top +
+        (extraHeight > 0 ? extraHeight : 0);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -212,7 +359,7 @@ class _DashboardHeader extends StatelessWidget {
 }
 
 class _MoneyMovementCard extends StatelessWidget {
-  final FinancialSummary summary;
+  final DashboardSummary summary;
 
   const _MoneyMovementCard({required this.summary});
 
@@ -221,8 +368,7 @@ class _MoneyMovementCard extends StatelessWidget {
     final theme = Theme.of(context);
 
     return _DashboardCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: _CardContents(
         children: [
           const _CardHeader(
             title: 'Money movement',
@@ -235,7 +381,7 @@ class _MoneyMovementCard extends StatelessWidget {
               Expanded(
                 child: _MovementMetric(
                   label: 'Received',
-                  amount: summary.totalReceived,
+                  amount: summary.totals.received,
                   icon: Icons.arrow_downward_rounded,
                   iconColor: const Color(0xFF0F9D8A),
                   amountColor: Colors.green.shade600,
@@ -245,7 +391,7 @@ class _MoneyMovementCard extends StatelessWidget {
               Expanded(
                 child: _MovementMetric(
                   label: 'Sent',
-                  amount: summary.totalSent,
+                  amount: summary.totals.sent,
                   icon: Icons.arrow_upward_rounded,
                   iconColor: const Color(0xFFD95C5C),
                   amountColor: Colors.red.shade600,
@@ -256,72 +402,87 @@ class _MoneyMovementCard extends StatelessWidget {
 
           const SizedBox(height: 18),
 
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF4F7F8),
-              borderRadius: BorderRadius.circular(16),
+          InkWell(
+            key: const ValueKey('internal-movement-link'),
+            onTap: () => _openBreakdown(
+              context,
+              summary,
+              BreakdownKind.internalMovement,
             ),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0B1F3A),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.account_balance_wallet_outlined,
-                        size: 18,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Internal movement',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF4F7F8),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
                           color: const Color(0xFF0B1F3A),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.account_balance_wallet_outlined,
+                          size: 18,
+                          color: Colors.white,
                         ),
                       ),
-                    ),
-                    Text(
-                      _money(summary.internalTransfers),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
-                        color: const Color.fromARGB(255, 69, 70, 71),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Internal movement',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF0B1F3A),
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _InternalTransferMetric(
-                        label: 'In',
-                        amount: summary.internalTransfersIn,
-                        icon: Icons.south_west_rounded,
-                        color: const Color(0xFF0F9D8A),
+                      Flexible(
+                        child: Text(
+                          _money(summary.totals.internalTransfers, context),
+                          textAlign: TextAlign.end,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                            color: const Color.fromARGB(255, 69, 70, 71),
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _InternalTransferMetric(
-                        label: 'Out',
-                        amount: summary.internalTransfersOut,
-                        icon: Icons.north_east_rounded,
-                        color: const Color(0xFFD95C5C),
+                      const Icon(Icons.chevron_right_rounded, size: 18),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _InternalTransferMetric(
+                          label:
+                              'Into ${accountLabel(summary.breakdown(BreakdownKind.internalMovement).filter.central.type)}',
+                          amount: summary.totals.transfersIntoCentral,
+                          icon: Icons.south_west_rounded,
+                          color: const Color(0xFF0F9D8A),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _InternalTransferMetric(
+                          label:
+                              'From ${accountLabel(summary.breakdown(BreakdownKind.internalMovement).filter.central.type)}',
+                          amount: summary.totals.transfersFromCentral,
+                          icon: Icons.north_east_rounded,
+                          color: const Color(0xFFD95C5C),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -373,11 +534,15 @@ class _MovementMetric extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 3),
-              Text(
-                _money(amount),
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: amountColor,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  _money(amount, context),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: amountColor,
+                  ),
                 ),
               ),
             ],
@@ -405,22 +570,32 @@ class _InternalTransferMetric extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 17, color: color),
-        const SizedBox(width: 7),
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: Colors.grey.shade600,
-          ),
+        Row(
+          children: [
+            Icon(icon, size: 17, color: color),
+            const SizedBox(width: 5),
+            Expanded(
+              child: Text(
+                label,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: Colors.grey.shade600,
+                ),
+              ),
+            ),
+          ],
         ),
-        const Spacer(),
-        Text(
-          _money(amount),
-          style: theme.textTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: const Color.fromARGB(255, 69, 70, 71),
+        const SizedBox(height: 5),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            _money(amount, context),
+            style: theme.textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF0B1F3A),
+            ),
           ),
         ),
       ],
@@ -429,101 +604,47 @@ class _InternalTransferMetric extends StatelessWidget {
 }
 
 class _OverviewCard extends StatelessWidget {
-  final FinancialSummary summary;
+  final DashboardSummary summary;
 
   const _OverviewCard({required this.summary});
 
   @override
   Widget build(BuildContext context) {
     return _DashboardCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: _CardContents(
         children: [
           const _CardHeader(title: 'Overview', icon: Icons.insights_rounded),
           const SizedBox(height: 18),
 
           _OverviewRow(
             label: 'Income',
-            amount: summary.totalIncome,
+            amount: summary.totals.income,
             icon: Icons.add_circle_outline_rounded,
             color: const Color(0xFF0F9D8A),
             amountColor: const Color(0xFF0F9D8A),
           ),
           _OverviewRow(
             label: 'Expenses',
-            amount: summary.totalExpenses,
+            amount: summary.totals.expenses,
             icon: Icons.remove_circle_outline_rounded,
             color: const Color(0xFFD95C5C),
             amountColor: const Color(0xFFD95C5C),
           ),
           _OverviewRow(
             label: 'Fees',
-            amount: summary.totalFees,
+            amount: summary.totals.fees,
             icon: Icons.receipt_long_outlined,
             color: const Color(0xFF687486),
             amountColor: const Color.fromARGB(255, 69, 70, 71),
           ),
           _OverviewRow(
-            label: 'Net movement',
-            amount: summary.netMovement,
+            label: 'Net cash flow',
+            amount: summary.totals.netCashFlow,
             icon: Icons.account_balance_outlined,
             color: const Color(0xFF0B1F3A),
             amountColor: const Color.fromARGB(255, 69, 70, 71),
             isLast: true,
           ),
-
-          if (summary.spendingBySubtype.isNotEmpty) ...[
-            const SizedBox(height: 22),
-            const _SubsectionTitle(title: 'Expense categories'),
-            const SizedBox(height: 10),
-            ..._sortedCategories(summary.spendingBySubtype)
-                .take(4)
-                .map(
-                  (entry) => _CategoryRow(
-                    subtype: entry.key,
-                    amount: entry.value,
-                    total: summary.totalExpenses,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => CategoryTransactionsScreen(
-                            subtype: entry.key,
-                            isIncome: false,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-          ],
-
-          if (summary.moneyInBySubtype.isNotEmpty) ...[
-            const SizedBox(height: 22),
-            const _SubsectionTitle(title: 'Money-in categories'),
-            const SizedBox(height: 10),
-            ..._sortedCategories(summary.moneyInBySubtype)
-                .take(4)
-                .map(
-                  (entry) => _CategoryRow(
-                    subtype: entry.key,
-                    amount: entry.value,
-                    total: summary.totalIncome,
-                    isIncome: true,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => CategoryTransactionsScreen(
-                            subtype: entry.key,
-                            isIncome: true,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-          ],
         ],
       ),
     );
@@ -571,11 +692,14 @@ class _OverviewRow extends StatelessWidget {
               ),
             ),
           ),
-          Text(
-            _money(amount),
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: amountColor,
+          Flexible(
+            child: Text(
+              _money(amount, context),
+              textAlign: TextAlign.end,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: amountColor,
+              ),
             ),
           ),
         ],
@@ -584,137 +708,34 @@ class _OverviewRow extends StatelessWidget {
   }
 }
 
-class _SubsectionTitle extends StatelessWidget {
-  final String title;
-
-  const _SubsectionTitle({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      title.toUpperCase(),
-      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-        fontWeight: FontWeight.w800,
-        letterSpacing: 0.8,
-        color: Colors.grey.shade500,
-      ),
-    );
-  }
-}
-
-class _CategoryRow extends StatelessWidget {
-  final RecordSubtype subtype;
-  final double amount;
-  final double total;
-  final bool isIncome;
-  final VoidCallback? onTap;
-
-  const _CategoryRow({
-    required this.subtype,
-    required this.amount,
-    required this.total,
-    this.isIncome = false,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final percentage = total <= 0 ? 0.0 : amount / total;
-
-    final accentColor = isIncome
-        ? const Color(0xFF0F9D8A)
-        : const Color(0xFFD95C5C);
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 7,
-                  height: 7,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: accentColor,
-                  ),
-                ),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: Text(
-                    _subtypeLabel(subtype),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: const Color(0xFF0B1F3A),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                Text(
-                  _money(amount),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: isIncome
-                        ? const Color(0xFF0F9D8A)
-                        : const Color(0xFFD95C5C),
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  size: 19,
-                  color: Colors.grey.shade400,
-                ),
-              ],
-            ),
-            const SizedBox(height: 7),
-            Row(
-              children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: LinearProgressIndicator(
-                      value: percentage,
-                      minHeight: 5,
-                      backgroundColor: const Color(0xFFEFF2F3),
-                      color: accentColor,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 9),
-                SizedBox(
-                  width: 38,
-                  child: Text(
-                    '${(percentage * 100).toStringAsFixed(0)}%',
-                    textAlign: TextAlign.right,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: Colors.grey.shade500,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
+void _openBreakdown(
+  BuildContext context,
+  DashboardSummary summary,
+  BreakdownKind kind,
+) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => FinancialBreakdownScreen(
+        kind: kind,
+        filter: ActivityFilter(
+          period: summary.period,
+          scope: FinancialBreakdownService.scopeFor(kind),
         ),
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _TopPartyCard extends StatelessWidget {
   final String title;
   final String subtitle;
-  final List<PartySummary> parties;
+  final List<FinancialGroup> parties;
   final bool isExpense;
   final int partyCount;
   final int transactionCount;
   final double averageTransaction;
+  final VoidCallback onOpen;
 
   const _TopPartyCard({
     required this.title,
@@ -724,6 +745,7 @@ class _TopPartyCard extends StatelessWidget {
     required this.partyCount,
     required this.transactionCount,
     required this.averageTransaction,
+    required this.onOpen,
   });
 
   @override
@@ -731,186 +753,209 @@ class _TopPartyCard extends StatelessWidget {
     final theme = Theme.of(context);
 
     return _DashboardCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _CardHeader(
-            title: title,
-            icon: isExpense
-                ? Icons.north_east_rounded
-                : Icons.south_west_rounded,
-          ),
-          const SizedBox(height: 10),
-          Text(
-            subtitle,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: Colors.grey.shade500,
+      child: InkWell(
+        onTap: onOpen,
+        child: _CardContents(
+          children: [
+            _CardHeader(
+              title: title,
+              icon: isExpense
+                  ? Icons.north_east_rounded
+                  : Icons.south_west_rounded,
             ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(
-                isExpense
-                    ? Icons.storefront_outlined
-                    : Icons.account_circle_outlined,
-                size: 16,
-                color: theme.colorScheme.onSurfaceVariant,
+            const SizedBox(height: 10),
+            Text(
+              subtitle,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: Colors.grey.shade500,
               ),
-              const SizedBox(width: 5),
-              Text(
-                isExpense ? '$partyCount merchants' : '$partyCount sources',
-                style: theme.textTheme.bodySmall,
-              ),
-              const Spacer(),
-              Text(
-                'Avg. transaction ${_money(averageTransaction)}',
-                style: theme.textTheme.bodySmall,
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          if (parties.isEmpty)
-            const _EmptyPartyState()
-          else
-            ...List.generate(
-              parties.length,
-              (index) => Column(
-                children: [
-                  _PartyRow(
-                    summary: parties[index],
-                    rank: index + 1,
-                    isExpense: isExpense,
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(
+                  isExpense
+                      ? Icons.storefront_outlined
+                      : Icons.account_circle_outlined,
+                  size: 16,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  _DashboardPendingValues.of(context)
+                      ? (isExpense ? '— merchants' : '— sources')
+                      : (isExpense
+                            ? '$partyCount merchants'
+                            : '$partyCount sources'),
+                  style: theme.textTheme.bodySmall,
+                ),
+                const Spacer(),
+                Flexible(
+                  child: Text(
+                    'Avg. transaction ${_money(averageTransaction, context)}',
+                    style: theme.textTheme.bodySmall,
                   ),
-                  if (index < parties.length - 1)
-                    Divider(
-                      height: 1,
-                      thickness: 1,
-                      color: Colors.grey.shade200,
-                      indent: 36,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            if (parties.isEmpty)
+              const _PeriodDataVisibility(child: _EmptyPartyState())
+            else
+              ...List.generate(
+                parties.length,
+                (index) => Column(
+                  children: [
+                    _PeriodDataVisibility(
+                      child: _PartyRow(
+                        summary: parties[index],
+                        isExpense: isExpense,
+                      ),
                     ),
-                ],
-              ),
-            ),
-          const SizedBox(height: 4),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.darkTeal,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                    if (index < parties.length - 1)
+                      Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: Colors.grey.shade200,
+                        indent: 36,
+                      ),
+                  ],
                 ),
               ),
-              onPressed: () {
-                // Breakdown screen
-              },
-              icon: const Icon(Icons.arrow_forward_rounded, size: 17),
-              label: Text(
-                isExpense
-                    ? 'View all Expenses ($transactionCount)'
-                    : 'View all Income ($transactionCount)',
+            const SizedBox(height: 4),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.darkTeal,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onPressed: onOpen,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.arrow_forward_rounded, size: 17),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        _DashboardPendingValues.of(context)
+                            ? (isExpense
+                                  ? 'View all Expenses'
+                                  : 'View all Income')
+                            : isExpense
+                            ? 'View all Expenses ($transactionCount)'
+                            : 'View all Income ($transactionCount)',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
 class _PartyRow extends StatelessWidget {
-  final PartySummary summary;
-  final int rank;
+  final FinancialGroup summary;
   final bool isExpense;
 
-  const _PartyRow({
-    required this.summary,
-    required this.rank,
-    required this.isExpense,
-  });
+  const _PartyRow({required this.summary, required this.isExpense});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final party = summary.party;
+    final party = summary.label;
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 26,
-            child: Text(
-              '$rank',
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: Colors.grey.shade400,
-                fontWeight: FontWeight.w800,
+    return InkWell(
+      key: ValueKey(summary.filter),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ActivityScreen(initialFilter: summary.filter),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: LayoutBuilder(
+          builder: (context, constraints) => Row(
+            children: [
+              _PartyAvatar(party: party),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      party,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: 13,
+                        color: const Color(0xFF0B1F3A),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${summary.count} '
+                      '${summary.count == 1 ? 'transaction' : 'transactions'}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ),
-          _PartyAvatar(party: party),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  party.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontSize: 13,
-                    color: const Color(0xFF0B1F3A),
-                    fontWeight: FontWeight.w500,
+              const SizedBox(width: 8),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: constraints.maxWidth * 0.4,
+                ),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    '${isExpense ? '-' : '+'}${_money(summary.amount, context)}',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: isExpense
+                          ? const Color(0xFFD95C5C)
+                          : const Color(0xFF0F9D8A),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '${summary.transactionCount} '
-                  '${summary.transactionCount == 1 ? 'transaction' : 'transactions'}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: Colors.grey.shade500,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Text(
-            '${isExpense ? '-' : '+'}${_money(summary.amount)}',
-            style: theme.textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: isExpense
-                  ? const Color(0xFFD95C5C)
-                  : const Color(0xFF0F9D8A),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
 class _PartyAvatar extends StatelessWidget {
-  final Party party;
+  final String party;
 
   const _PartyAvatar({required this.party});
 
   @override
   Widget build(BuildContext context) {
-    final letter = party.name.trim().isEmpty
-        ? '?'
-        : party.name.trim()[0].toUpperCase();
+    final letter = party.trim().isEmpty ? '?' : party.trim()[0].toUpperCase();
 
     return Container(
       width: 38,
@@ -948,99 +993,451 @@ class _EmptyPartyState extends StatelessWidget {
   }
 }
 
-class _ActivityCard extends StatelessWidget {
-  final List<FinancialRecord> transactions;
-
-  const _ActivityCard({required this.transactions});
+class _AccountActivityCard extends StatelessWidget {
+  final DashboardSummary summary;
+  final BreakdownKind kind;
+  final String title, action;
+  final IconData icon;
+  const _AccountActivityCard({
+    required this.summary,
+    required this.kind,
+    required this.title,
+    required this.action,
+    required this.icon,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return _DashboardCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _CardHeader(title: 'Recent activity', icon: Icons.bolt_rounded),
-          const SizedBox(height: 16),
-          if (transactions.isEmpty)
-            Text(
-              'No transactions for this period.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: Colors.grey.shade500),
-            )
-          else
-            ...transactions.map(
-              (transaction) => _ActivityRow(transaction: transaction),
-            ),
-        ],
+    final theme = Theme.of(context);
+    final loans = kind == BreakdownKind.loans;
+    final sections = summary
+        .breakdown(kind)
+        .sections
+        .where((section) => section.includedInTotal)
+        .take(2)
+        .toList();
+    void open() => _openBreakdown(context, summary, kind);
+    return Card(
+      color: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      child: InkWell(
+        onTap: null,
+        borderRadius: BorderRadius.circular(22),
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 18),
+          child: _CardContents(
+            children: [
+              _CardHeaderSurface(
+                child: Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: AppTheme.darkBlue.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(icon, color: AppTheme.darkBlue),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.darkBlue,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            loans
+                                ? 'Loan activity this period'
+                                : 'Money moved this period',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: AppTheme.darkBlue.withValues(alpha: 0.65),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              if (!loans)
+                for (final pair in const [
+                  [
+                    (
+                      BreakdownKind.investmentPurchases,
+                      'Purchases',
+                      Icons.trending_up_rounded,
+                    ),
+                    (
+                      BreakdownKind.investmentRedemptions,
+                      'Redemptions',
+                      Icons.south_west_rounded,
+                    ),
+                  ],
+                  [
+                    (
+                      BreakdownKind.savingsDeposits,
+                      'Deposits',
+                      Icons.savings_outlined,
+                    ),
+                    (
+                      BreakdownKind.savingsWithdrawals,
+                      'Withdrawals',
+                      Icons.north_east_rounded,
+                    ),
+                  ],
+                ])
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        pair.first.$1 == BreakdownKind.investmentPurchases
+                            ? 'Investments'
+                            : 'Savings',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.darkBlue,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (var index = 0; index < pair.length; index++) ...[
+                            if (index > 0) const SizedBox(width: 16),
+                            Expanded(
+                              child: _CapitalMovementRow(
+                                summary: summary,
+                                kind: pair[index].$1,
+                                label: pair[index].$2,
+                                icon: pair[index].$3,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                  ),
+              if (loans)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var index = 0; index < sections.length; index++) ...[
+                      if (index > 0) const SizedBox(width: 12),
+                      Expanded(
+                        child: Container(
+                          padding: loans
+                              ? EdgeInsets.zero
+                              : const EdgeInsets.all(12),
+                          decoration: loans
+                              ? null
+                              : BoxDecoration(
+                                  color: AppTheme.darkTeal.withValues(
+                                    alpha: 0.05,
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                sections[index].label,
+                                style: theme.textTheme.bodySmall,
+                              ),
+                              const SizedBox(height: 6),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    _money(sections[index].amount, context),
+                                    style: theme.textTheme.titleMedium
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                          color: loans && index == 0
+                                              ? theme.colorScheme.error
+                                              : AppTheme.darkTeal,
+                                        ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                _DashboardPendingValues.of(context)
+                                    ? '— transactions'
+                                    : '${sections[index].count} transactions',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                              if (!loans) ...[
+                                const SizedBox(height: 6),
+                                Text(
+                                  index == 0
+                                      ? 'Deposits & withdrawals'
+                                      : 'Purchases & redemptions',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: open,
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    backgroundColor: AppTheme.darkTeal,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(action, textAlign: TextAlign.center),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-class _ActivityRow extends StatelessWidget {
-  final FinancialRecord transaction;
-
-  const _ActivityRow({required this.transaction});
-
+class _CapitalMovementRow extends StatelessWidget {
+  final DashboardSummary summary;
+  final BreakdownKind kind;
+  final String label;
+  final IconData icon;
+  const _CapitalMovementRow({
+    required this.summary,
+    required this.kind,
+    required this.label,
+    required this.icon,
+  });
   @override
   Widget build(BuildContext context) {
-    final isIncome = transaction.type.name == 'income';
-
-    final color = isIncome ? const Color(0xFF0F9D8A) : const Color(0xFF0B1F3A);
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: Icon(
-              isIncome ? Icons.south_west_rounded : Icons.north_east_rounded,
-              size: 18,
-              color: color,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    final breakdown = summary.breakdown(kind);
+    final moneyOut =
+        kind == BreakdownKind.investmentPurchases ||
+        kind == BreakdownKind.savingsDeposits;
+    final movementColor = moneyOut
+        ? Colors.red.shade600
+        : Colors.green.shade600;
+    return InkWell(
+      key: ValueKey(kind),
+      onTap: () => _openBreakdown(context, summary, kind),
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Text(
-                  transaction.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF0B1F3A),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  transaction.subtype.name,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelSmall?.copyWith(color: Colors.grey.shade500),
+                Icon(icon, size: 20, color: movementColor),
+                const Spacer(),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  size: 18,
+                  color: Colors.grey,
                 ),
               ],
             ),
-          ),
-          Text(
-            '${isIncome ? '+' : '-'}${_money(transaction.amount)}',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: color,
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
-          ),
-        ],
+            Text(
+              _DashboardPendingValues.of(context)
+                  ? '— transactions'
+                  : '${breakdown.count} transactions',
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: Colors.grey.shade500),
+            ),
+            const SizedBox(height: 8),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                _money(breakdown.amount, context),
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: movementColor,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
+}
+
+class _CategorySummaryCard extends StatelessWidget {
+  final DashboardSummary summary;
+  final BreakdownKind kind;
+  final String title;
+  final IconData icon;
+  const _CategorySummaryCard({
+    required this.summary,
+    required this.kind,
+    required this.title,
+    required this.icon,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final breakdown = summary.breakdown(kind);
+    final expense = kind == BreakdownKind.spending;
+    return _DashboardCard(
+      child: InkWell(
+        onTap: () => _openBreakdown(context, summary, kind),
+        borderRadius: BorderRadius.circular(12),
+        child: _CardContents(
+          children: [
+            _CardHeaderSurface(
+              child: Row(
+                children: [
+                  Icon(icon, size: 20, color: AppTheme.darkBlue),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.darkBlue,
+                      ),
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 20,
+                    color: AppTheme.darkBlue,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (breakdown.count == 0 && !_DashboardPendingValues.of(context))
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Text('No activity for this period.'),
+              ),
+            for (final group in breakdown.groups.take(4))
+              _PeriodDataVisibility(
+                child: FinancialGroupRow(
+                  key: ValueKey(group.filter),
+                  group: group,
+                  compact: true,
+                  showShare: true,
+                  accentColor: expense
+                      ? Colors.red.shade600
+                      : Colors.green.shade600,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => FinancialBreakdownScreen(
+                        kind: expense
+                            ? BreakdownKind.expenseParties
+                            : BreakdownKind.incomeParties,
+                        filter: group.filter,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActivityCard extends StatelessWidget {
+  final List<FinancialRecord> transactions;
+  final ActivityFilter filter;
+  const _ActivityCard({required this.transactions, required this.filter});
+  @override
+  Widget build(BuildContext context) => _DashboardCard(
+    child: _CardContents(
+      children: [
+        const _CardHeader(title: 'Recent activity', icon: Icons.bolt_rounded),
+        const SizedBox(height: 12),
+        if (transactions.isEmpty && !_DashboardPendingValues.of(context))
+          const Text('No activity for the current month.'),
+        for (final transaction in transactions)
+          _PeriodDataVisibility(
+            child: TransactionRow(record: transaction, central: filter.central),
+          ),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ActivityScreen(initialFilter: filter),
+              ),
+            ),
+            child: const Text('View all activity'),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _CardContents extends StatelessWidget {
+  final List<Widget> children;
+  const _CardContents({required this.children});
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      for (var index = 0; index < children.length; index++)
+        if (index == 0)
+          children[index]
+        else
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            child: children[index],
+          ),
+    ],
+  );
+}
+
+class _CardHeaderSurface extends StatelessWidget {
+  final Widget child;
+  const _CardHeaderSurface({required this.child});
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+    child: child,
+  );
 }
 
 class _CardHeader extends StatelessWidget {
@@ -1051,27 +1448,31 @@ class _CardHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: const Color(0xFF0B1F3A).withValues(alpha: 0.07),
-            borderRadius: BorderRadius.circular(9),
+    return _CardHeaderSurface(
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: AppTheme.darkBlue.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Icon(icon, size: 17, color: AppTheme.darkBlue),
           ),
-          child: Icon(icon, size: 17, color: const Color(0xFF0B1F3A)),
-        ),
-        const SizedBox(width: 9),
-        Text(
-          title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: const Color(0xFF0B1F3A),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              title,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.darkBlue,
+              ),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -1085,347 +1486,13 @@ class _DashboardCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.only(bottom: 18),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: const Color(0xFFE9EEF0)),
       ),
       child: child,
-    );
-  }
-}
-
-class _LoansCard extends StatelessWidget {
-  final FinancialSummary summary;
-
-  const _LoansCard({required this.summary});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: colors.primary.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.account_balance_rounded,
-                    color: colors.primary,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Loans',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: colors.secondary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Fuliza activity this month',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: colors.onSurfaceVariant,
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 20),
-
-            Row(
-              children: [
-                Expanded(
-                  child: _LoanMetric(
-                    label: 'Borrowed',
-                    amount: summary.totalLoansBorrowed ?? 0,
-                    transactionCount:
-                        summary.loanBorrowingTransactionCount ?? 0,
-                    color: colors.error,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _LoanMetric(
-                    label: 'Repaid',
-                    amount: summary.totalLoanRepayments ?? 0,
-                    transactionCount:
-                        summary.loanRepaymentTransactionCount ?? 0,
-                    color: colors.primary,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () {},
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: colors.primary,
-                  side: BorderSide(
-                    color: colors.primary.withValues(alpha: 0.35),
-                  ),
-                  minimumSize: const Size(0, 44),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: const Text('View loan activity'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _LoanMetric extends StatelessWidget {
-  final String label;
-  final double amount;
-  final int transactionCount;
-  final Color color;
-
-  const _LoanMetric({
-    required this.label,
-    required this.amount,
-    required this.transactionCount,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'KSh ${amount.toStringAsFixed(0)}',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            '$transactionCount ${transactionCount == 1 ? 'transaction' : 'transactions'}',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InvestmentsCard extends StatelessWidget {
-  final FinancialSummary summary;
-
-  const _InvestmentsCard({required this.summary});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: colors.primary.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(Icons.savings_outlined, color: colors.primary),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Investments & Savings',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: colors.secondary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Investment activity this month',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: colors.onSurfaceVariant,
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: _InvestmentMetric(
-                    label: 'Invested',
-                    amount: summary.totalInvested,
-                    transactionCount: summary.investmentTransactionCount,
-                    icon: Icons.trending_up_rounded,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _InvestmentMetric(
-                    label: 'Withdrawn',
-                    amount: summary.totalInvestmentWithdrawals,
-                    transactionCount:
-                        summary.investmentWithdrawalTransactionCount,
-                    icon: Icons.south_west_rounded,
-                    amountColor: colors.error,
-                    backgroundColor: colors.error,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () {},
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: colors.primary,
-                  side: BorderSide(
-                    color: colors.primary.withValues(alpha: 0.35),
-                  ),
-                  minimumSize: const Size(0, 44),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: const Text('View investment activity'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _InvestmentMetric extends StatelessWidget {
-  final String label;
-  final double amount;
-  final int transactionCount;
-  final IconData icon;
-  final Color? amountColor;
-  final Color? backgroundColor;
-
-  const _InvestmentMetric({
-    required this.label,
-    required this.amount,
-    required this.transactionCount,
-    required this.icon,
-    this.amountColor,
-    this.backgroundColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = theme.colorScheme.primary;
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: (backgroundColor ?? color).withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 16, color: color),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            _money(amount),
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: amountColor ?? color,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            '$transactionCount '
-            '${transactionCount == 1 ? 'transaction' : 'transactions'}',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -1462,87 +1529,5 @@ class _ErrorState extends StatelessWidget {
   }
 }
 
-List<MapEntry<RecordSubtype, double>> _sortedCategories(
-  Map<RecordSubtype, double> categories,
-) {
-  final entries = categories.entries.toList();
-
-  entries.sort((a, b) => b.value.compareTo(a.value));
-
-  return entries;
-}
-
-String _subtypeLabel(RecordSubtype subtype) {
-  switch (subtype) {
-    case RecordSubtype.sendMoney:
-      return 'Send Money';
-
-    case RecordSubtype.receiveMoney:
-      return 'Received';
-
-    case RecordSubtype.buyGoods:
-      return 'Buy Goods';
-
-    case RecordSubtype.airtimePurchase:
-      return 'Airtime';
-
-    case RecordSubtype.payBill:
-      return 'PayBill';
-
-    case RecordSubtype.withdrawal:
-      return 'Cash withdrawal';
-
-    case RecordSubtype.deposit:
-      return 'Cash deposit';
-
-    case RecordSubtype.mshwariDeposit:
-      return 'M-Shwari deposit';
-
-    case RecordSubtype.mshwariWithdrawal:
-      return 'M-Shwari withdrawal';
-
-    case RecordSubtype.kcbDeposit:
-      return 'KCB M-PESA deposit';
-
-    case RecordSubtype.kcbWithdrawal:
-      return 'KCB M-PESA withdrawal';
-
-    case RecordSubtype.fulizaLoan:
-      return 'Fuliza';
-
-    case RecordSubtype.fulizaRepayment:
-      return 'Fuliza repayment';
-
-    case RecordSubtype.investmentPurchase:
-      return 'Investment';
-
-    case RecordSubtype.investmentRedemption:
-      return 'Investment redemption';
-
-    case RecordSubtype.unknown:
-      return 'Other';
-    case RecordSubtype.airtimeTopUp:
-      return 'Airtime top-up';
-    case RecordSubtype.loanRepayment:
-      return 'Loan repayment';
-    case RecordSubtype.loanDisbursement:
-      return 'Loan disbursement';
-    case RecordSubtype.savingsDeposit:
-      return 'Savings deposit';
-    case RecordSubtype.savingsWithdrawal:
-      return 'Savings withdrawal';
-    case RecordSubtype.billPayment:
-      return 'Bill payment';
-  }
-}
-
-String _money(double amount) {
-  final value = amount.round();
-
-  final formatted = value.toString().replaceAllMapped(
-    RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
-    (match) => '${match.group(1)},',
-  );
-
-  return 'KSh $formatted';
-}
+String _money(double amount, BuildContext context) =>
+    _DashboardPendingValues.of(context) ? '—' : formatMoney(amount);

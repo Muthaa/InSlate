@@ -1,8 +1,12 @@
 import '../core/enums/record_subtype.dart';
 import 'financial_records.dart';
 import 'party_summary.dart';
+import '../services/financial_semantics.dart';
 
 class FinancialSummary {
+  /// Target accounting semantics. The older fields below remain a legacy
+  /// Dashboard contract until that UI is migrated in a later phase.
+  final FinancialTotals financialTotals;
   final DateTime period;
   final double currentBalance;
 
@@ -17,6 +21,12 @@ class FinancialSummary {
 
   final double totalFees;
   final double netMovement;
+
+  /// Explicit compatibility values for consumers not yet using financialTotals.
+  double get legacyExpensesIncludingFees => totalExpenses;
+  double get legacyPrincipalNetMovement => netMovement;
+  Map<RecordSubtype, double> get legacySpendingIncludingFees =>
+      spendingBySubtype;
 
   final int transactionCount;
   final int expenseTransactionCount;
@@ -48,6 +58,7 @@ class FinancialSummary {
   final int investmentWithdrawalTransactionCount;
 
   const FinancialSummary({
+    required this.financialTotals,
     required this.period,
     required this.currentBalance,
     required this.totalIncome,

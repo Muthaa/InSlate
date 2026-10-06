@@ -6,6 +6,7 @@ import 'message_classifier.dart';
 import '/core/extensions/string_extensions.dart';
 import '/core/constants/investment_keywords.dart';
 import '/core/constants/mpesa_patterns.dart';
+import '/core/constants/mshwari_loan_patterns.dart';
 
 class MpesaMessageClassifier implements MessageClassifier {
   @override
@@ -32,6 +33,31 @@ class MpesaMessageClassifier implements MessageClassifier {
 
     if (status == TransactionStatus.unknown) {
       return _result(MessageType.notification, RecordSubtype.unknown, status);
+    }
+
+    // Loan clauses take priority over generic payments and savings transfers.
+    if (status == TransactionStatus.successful) {
+      if (MshwariLoanPatterns.disbursement.hasMatch(message)) {
+        return _result(
+          MessageType.transaction,
+          RecordSubtype.loanDisbursement,
+          status,
+        );
+      }
+      if (MshwariLoanPatterns.repaymentMatch(message) != null) {
+        return _result(
+          MessageType.transaction,
+          RecordSubtype.loanRepayment,
+          status,
+        );
+      }
+    }
+    final balanceIndex = text.indexOf('new m-pesa balance');
+    final transactionText = balanceIndex < 0
+        ? text
+        : text.substring(0, balanceIndex);
+    if (transactionText.contains('m-shwari loan')) {
+      return _result(MessageType.transaction, RecordSubtype.unknown, status);
     }
 
     // Investment Purchase
