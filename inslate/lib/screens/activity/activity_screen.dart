@@ -18,7 +18,23 @@ class ActivityScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: AppTheme.appBackground,
-    appBar: AppBar(title: const Text('Activity')),
+    appBar: AppBar(
+      backgroundColor: AppTheme.darkBlue,
+      foregroundColor: Colors.white,
+      title: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Activity',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+          ),
+          Text(
+            'Your financial timeline',
+            style: TextStyle(fontSize: 12, color: Colors.white70),
+          ),
+        ],
+      ),
+    ),
     body: ActivityContent(initialFilter: initialFilter),
   );
 }
@@ -121,14 +137,34 @@ class _ActivityContentState extends ConsumerState<ActivityContent> {
       top: false,
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+            padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFE8ECEF)),
+            ),
             child: Row(
               children: [
+                const Icon(
+                  Icons.calendar_month_outlined,
+                  size: 20,
+                  color: AppTheme.teal,
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<FinancialPeriod>(
                       isExpanded: true,
+                      icon: const Icon(
+                        Icons.expand_more_rounded,
+                        color: AppTheme.darkBlue,
+                      ),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppTheme.darkBlue,
+                        fontWeight: FontWeight.w600,
+                      ),
                       value: _filter.period,
                       items: periods
                           .map(
@@ -170,7 +206,7 @@ class _ActivityContentState extends ConsumerState<ActivityContent> {
               child: const Text('Unable to load available months. Retry'),
             ),
           SizedBox(
-            height: 48,
+            height: 56,
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               scrollDirection: Axis.horizontal,
@@ -181,6 +217,28 @@ class _ActivityContentState extends ConsumerState<ActivityContent> {
                 return ChoiceChip(
                   label: Text(scopeLabel(scope)),
                   selected: scope == _filter.scope,
+                  showCheckmark: false,
+                  selectedColor: switch (scope) {
+                    ActivityScope.income => Colors.green.shade700,
+                    ActivityScope.expenses => Colors.red.shade700,
+                    _ => AppTheme.darkBlue,
+                  },
+                  backgroundColor: Colors.white,
+                  side: BorderSide(
+                    color: scope == _filter.scope
+                        ? Colors.transparent
+                        : const Color(0xFFE8ECEF),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  labelStyle: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: scope == _filter.scope
+                        ? Colors.white
+                        : AppTheme.darkBlue,
+                  ),
                   onSelected: (_) => _changeFilter(_filter.withScope(scope)),
                 );
               },
@@ -188,8 +246,13 @@ class _ActivityContentState extends ConsumerState<ActivityContent> {
           ),
           if (_filter.scope == ActivityScope.internalTransfers ||
               _filter.scope == ActivityScope.investmentsAndSavings)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+              ),
               child: Row(
                 children: [
                   Expanded(
@@ -319,7 +382,7 @@ class _ActivityContentState extends ConsumerState<ActivityContent> {
                 ],
               ),
             ),
-          const Divider(height: 1),
+          const SizedBox(height: 8),
           Expanded(
             child: pageAsync.when(
               skipLoadingOnRefresh: false,
@@ -340,10 +403,10 @@ class _ActivityContentState extends ConsumerState<ActivityContent> {
               ),
               data: (page) {
                 if (page.count == 0) {
-                  return const Center(
-                    child: Text(
-                      'No activity found for this period and filters.',
-                    ),
+                  return const _ActivityEmptyState(
+                    icon: Icons.receipt_long_outlined,
+                    title: 'Nothing to show yet',
+                    message: 'No activity found for this period and filters.',
                   );
                 }
                 return ListView.builder(
@@ -357,16 +420,50 @@ class _ActivityContentState extends ConsumerState<ActivityContent> {
                       children: [
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Text(
-                            DateFormat.yMMMMEEEEd().format(day.date),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF0B1F3A),
-                            ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  DateFormat.yMMMMEEEEd().format(day.date),
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF0B1F3A),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.darkBlue.withValues(
+                                    alpha: 0.06,
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  '${day.records.length}',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: AppTheme.darkBlue,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         Card(
                           margin: EdgeInsets.zero,
+                          color: Colors.white,
+                          surfaceTintColor: Colors.transparent,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            side: const BorderSide(color: Color(0xFFE8ECEF)),
+                          ),
                           child: Column(
                             children: [
                               for (var i = 0; i < day.records.length; i++) ...[
@@ -391,8 +488,14 @@ class _ActivityContentState extends ConsumerState<ActivityContent> {
               },
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE8ECEF)),
+            ),
             child: Row(
               children: [
                 TextButton(
@@ -405,7 +508,15 @@ class _ActivityContentState extends ConsumerState<ActivityContent> {
                   child: const Text('Previous'),
                 ),
                 Expanded(
-                  child: Text('Page ${_page + 1}', textAlign: TextAlign.center),
+                  child: Text(
+                    'Page ${_page + 1}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.darkBlue,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
                 TextButton(
                   onPressed:
@@ -425,4 +536,50 @@ class _ActivityContentState extends ConsumerState<ActivityContent> {
       ),
     );
   }
+}
+
+class _ActivityEmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title, message;
+  const _ActivityEmptyState({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: AppTheme.teal.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: Icon(icon, size: 32, color: AppTheme.teal),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: AppTheme.darkBlue,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+          ),
+        ],
+      ),
+    ),
+  );
 }
