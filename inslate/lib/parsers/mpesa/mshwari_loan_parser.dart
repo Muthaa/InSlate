@@ -22,11 +22,9 @@ class MshwariLoanParser implements Parser {
           'Unsupported M-Shwari loan transaction.',
         );
       }
-      final match =
-          (borrowed
-                  ? MshwariLoanPatterns.disbursement
-                  : MshwariLoanPatterns.repayment)
-              .firstMatch(message.body);
+      final match = borrowed
+          ? MshwariLoanPatterns.disbursement.firstMatch(message.body)
+          : MshwariLoanPatterns.repaymentMatch(message.body);
       if (match == null) {
         return const ParseResult.failure('Unrecognized M-Shwari loan clause.');
       }
@@ -49,7 +47,12 @@ class MshwariLoanParser implements Parser {
                   ),
             balance: common.balance,
             // "less excise duty" alone supplies no fee amount.
-            transactionCost: common.transactionCost,
+            transactionCost:
+                MshwariLoanPatterns.explicitCost
+                    .firstMatch(message.body)
+                    ?.group(1)
+                    ?.toMoney() ??
+                common.transactionCost,
           ),
           classification: classification,
           title: borrowed

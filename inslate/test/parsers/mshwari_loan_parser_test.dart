@@ -33,6 +33,55 @@ FinancialRecord parse(String body) {
 void main() {
   final period = FinancialPeriod.month(DateTime(2026, 10));
   test(
+    'production savings-funded repayment enters Repaid with correct fields and exclusions',
+    () {
+      final record = parse(mshwariRepaidLoan);
+      expect(record.reference, 'UJ6NY91WQ1');
+      expect(record.subtype, RecordSubtype.loanRepayment);
+      expect(record.type, FinancialRecordType.loan);
+      expect(record.status, TransactionStatus.successful);
+      expect(record.amount, 4300);
+      expect(record.transactionDate, DateTime(2026, 10, 6, 20, 29));
+      expect(record.party!.name, 'M-Shwari');
+      expect(record.transactionCost, 0);
+      // Neither savings balance nor debt balance is an M-PESA balance.
+      expect(record.balance, isNull);
+      expect(record.rawMessage, mshwariRepaidLoan);
+      final summary = const FinancialBreakdownService().dashboard([
+        record,
+      ], period);
+      expect(summary.totals.repaid, 4300);
+      expect([
+        summary.totals.income,
+        summary.totals.expenses,
+        summary.totals.sent,
+        summary.totals.received,
+        summary.totals.internalTransfers,
+        summary.totals.netCashFlow,
+      ], everyElement(0));
+      final group = summary
+          .breakdown(BreakdownKind.loans)
+          .sections
+          .singleWhere((section) => section.label == 'Repaid')
+          .groups
+          .single;
+      expect(group.label, contains('M-Shwari'));
+      expect(group.filter.matches(record), isTrue);
+      expect(
+        summary.breakdown(BreakdownKind.investmentsAndSavings).groups,
+        isEmpty,
+      );
+    },
+  );
+  test('explicit Kshs repayment fee is parsed rather than defaulted', () {
+    expect(
+      parse(
+        mshwariRepaidLoan.replaceFirst('cost Kshs 0.00', 'cost Kshs 7.50'),
+      ).transactionCost,
+      7.5,
+    );
+  });
+  test(
     'real approved loan parses principal, date, balance and provider without inferred duty',
     () {
       final record = parse(mshwariApprovedLoan);

@@ -44,7 +44,7 @@ class MpesaMessageClassifier implements MessageClassifier {
           status,
         );
       }
-      if (MshwariLoanPatterns.repayment.hasMatch(message)) {
+      if (MshwariLoanPatterns.repaymentMatch(message) != null) {
         return _result(
           MessageType.transaction,
           RecordSubtype.loanRepayment,

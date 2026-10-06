@@ -10,6 +10,12 @@ This is a handover of the working tree, not a claim that all changes are committ
 
 ## 1. Executive status
 
+### Subsequent update: production M-Shwari repayment fixture
+
+After the original snapshot, the user supplied `UJ6NY91WQ1`: “Loan of Ksh4,300.00 repaid from  M-Shwari on 6/10/26 at 8:29 PM.” This production format is now supported by a separate anchored repayment pattern, using generic `loanRepayment` and M-Shwari provider identity. It contributes KSh 4,300 to Loans → Repaid and is excluded from expense/income/internal-transfer/capital principal totals. The explicit `Transaction cost Kshs 0.00` wording is parsed, with a nonzero-cost regression test as well.
+
+The SMS reports M-Shwari savings balance KSh 107.34 and loan balance KSh 0.00. These stay in raw SMS rather than being misrepresented in the current M-PESA balance field or used to infer an account ledger. This update supersedes earlier statements below that no real repayment fixture was available; the older conservative grammar remains supported, and additional top-up variants still use synthetic tests. Stored-message backfill limitations remain unchanged.
+
 InSlate is moving from an SMS transaction viewer into a financial application driven by normalized financial records and explicit financial meaning. M-PESA is the currently observable central wallet. The read-side model allows typed periods, financial scopes, parties, account families, and transfer direction without introducing a new router or redesigning ingestion.
 
 The current milestone delivers a period-aware Home dashboard, reusable financial breakdowns, and a canonical Activity explorer. It also adds M-Shwari loan ingestion using the existing generic loan subtypes. Insights and Profile/Your Data are still future milestones.
