@@ -7,6 +7,9 @@ import '../core/enums/transaction_status.dart';
 import '../database/app_database.dart';
 import '../models/financial_records.dart' as domain;
 import '../models/party.dart';
+import '../models/financial_period.dart';
+import '../models/activity_filter.dart';
+import '../services/financial_semantics.dart';
 
 class FinancialRecordsRepository {
   final AppDatabase database;
@@ -96,6 +99,71 @@ class FinancialRecordsRepository {
 
     return rows.map(_toDomain).toList();
   }
+
+  Future<List<domain.FinancialRecord>> getForPeriod(
+    FinancialPeriod period,
+  ) async {
+    final rows = await database.financialRecordsDao.getRecordsForPeriod(period);
+    return rows.map(_toDomain).toList();
+  }
+
+  Future<List<domain.FinancialRecord>> getActivity(
+    ActivityFilter filter, {
+    int? limit,
+    int offset = 0,
+  }) async {
+    if (offset < 0 || (limit != null && limit <= 0)) {
+      throw ArgumentError('Invalid page bounds');
+    }
+    if (filter.party != null || filter.endpoint?.identity != null) {
+      // SQLite lower/trim do not implement Dart's Unicode normalization.
+      // Resolve identities with the shared policy in bounded, period-filtered
+      // batches, before applying the requested result offset and limit.
+      final candidateFilter = ActivityFilter(
+        period: filter.period,
+        scope: filter.scope,
+        subtype: filter.subtype,
+        partyPresence: filter.partyPresence,
+        resolution: filter.resolution,
+        direction: filter.direction,
+        central: filter.central,
+        endpoint: filter.endpoint == null
+            ? null
+            : AccountEndpoint(filter.endpoint!.type),
+      );
+      const batchSize = 100;
+      final matches = <domain.FinancialRecord>[];
+      var candidateOffset = 0;
+      var matchedCount = 0;
+      while (true) {
+        final rows = await database.financialRecordsDao.getActivityCandidates(
+          candidateFilter,
+          limit: batchSize,
+          offset: candidateOffset,
+        );
+        for (final row in rows) {
+          final record = _toDomain(row);
+          if (!filter.matches(record)) continue;
+          if (matchedCount++ < offset) continue;
+          matches.add(record);
+          if (limit != null && matches.length == limit) return matches;
+        }
+        if (rows.length < batchSize) return matches;
+        candidateOffset += rows.length;
+      }
+    }
+    final rows = await database.financialRecordsDao.getActivityCandidates(
+      filter,
+      limit: limit,
+      offset: offset,
+    );
+    return rows.map(_toDomain).toList();
+  }
+
+  Future<Set<DateTime>> getEffectiveMonths() =>
+      database.financialRecordsDao.getEffectiveMonths();
+  Future<({DateTime? first, DateTime? last})> getEffectiveDateBounds() =>
+      database.financialRecordsDao.getEffectiveDateBounds();
 
   domain.FinancialRecord _toDomain(FinancialRecord row) {
     return domain.FinancialRecord(

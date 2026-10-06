@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
 import 'dashboard/dashboard_screen.dart';
+import 'activity/activity_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/import_provider.dart';
 
@@ -15,11 +16,12 @@ class _AppShellState extends ConsumerState<AppShell>
     with WidgetsBindingObserver {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = const [
-    DashboardScreen(),
-    _PlaceholderScreen(title: 'Activity', icon: Icons.receipt_long_rounded),
-    _PlaceholderScreen(title: 'Insights', icon: Icons.insights_rounded),
-    _PlaceholderScreen(title: 'More', icon: Icons.more_horiz_rounded),
+  bool _activityInitialized = false;
+  final List<Widget> _screens = [
+    const DashboardScreen(),
+    const SizedBox.shrink(),
+    const _PlaceholderScreen(title: 'Insights', icon: Icons.insights_rounded),
+    const _PlaceholderScreen(title: 'More', icon: Icons.more_horiz_rounded),
   ];
 
   @override
@@ -65,6 +67,10 @@ class _AppShellState extends ConsumerState<AppShell>
           selectedIndex: _currentIndex,
           onDestinationSelected: (index) {
             setState(() {
+              if (index == 1 && !_activityInitialized) {
+                _screens[1] = const ActivityScreen();
+                _activityInitialized = true;
+              }
               _currentIndex = index;
             });
           },

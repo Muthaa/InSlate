@@ -4,8 +4,11 @@ import '../models/financial_records.dart';
 import '../models/financial_summary.dart';
 import '../models/party.dart';
 import '../models/party_summary.dart';
+import 'financial_semantics.dart';
 
 class FinancialSummaryService {
+  /// Preserves the existing Dashboard metrics; [FinancialSummary.financialTotals]
+  /// exposes the new principal/fee accounting contract separately.
   FinancialSummary calculate(
     List<FinancialRecord> records, {
     required DateTime period,
@@ -49,8 +52,8 @@ class FinancialSummaryService {
     final incomeBySubtype = <RecordSubtype, double>{};
     final incomeTransactionCountBySubtype = <RecordSubtype, int>{};
 
-    final expenseParties = <String, _PartyAccumulator>{};
-    final incomeParties = <String, _PartyAccumulator>{};
+    final expenseParties = <PartyIdentity, _PartyAccumulator>{};
+    final incomeParties = <PartyIdentity, _PartyAccumulator>{};
 
     for (final record in periodRecords) {
       totalFees += record.transactionCost;
@@ -193,6 +196,7 @@ class FinancialSummaryService {
     final netMovement = totalReceived - totalSent;
 
     return FinancialSummary(
+      financialTotals: const FinancialSemantics().calculate(periodRecords),
       period: period,
       currentBalance: currentBalance,
       totalIncome: totalIncome,
@@ -265,7 +269,7 @@ class FinancialSummaryService {
   }
 
   void _addParty(
-    Map<String, _PartyAccumulator> parties,
+    Map<PartyIdentity, _PartyAccumulator> parties,
     FinancialRecord record,
   ) {
     final party = record.party;
@@ -274,7 +278,7 @@ class FinancialSummaryService {
       return;
     }
 
-    final key = _partyKey(party);
+    final key = PartyIdentity.fromParty(party);
 
     final existing = parties[key];
 
@@ -291,29 +295,9 @@ class FinancialSummaryService {
     existing.transactionCount++;
   }
 
-  String _partyKey(Party party) {
-    final identifier = party.identifier?.trim();
-
-    if (identifier != null && identifier.isNotEmpty) {
-      return 'identifier:${identifier.toLowerCase()}';
-    }
-
-    final phone = party.phone?.trim();
-
-    if (phone != null && phone.isNotEmpty) {
-      return 'phone:$phone';
-    }
-
-    final account = party.account?.trim();
-
-    if (account != null && account.isNotEmpty) {
-      return 'account:${account.toLowerCase()}';
-    }
-
-    return 'name:${party.type.name}:${party.name.trim().toLowerCase()}';
-  }
-
-  List<PartySummary> _buildTopParties(Map<String, _PartyAccumulator> parties) {
+  List<PartySummary> _buildTopParties(
+    Map<PartyIdentity, _PartyAccumulator> parties,
+  ) {
     final results = parties.values
         .map(
           (item) => PartySummary(

@@ -12,6 +12,10 @@ import 'package:inslate/services/transaction_import_service.dart';
 import 'package:inslate/models/raw_message.dart' as domain;
 import 'package:inslate/repositories/raw_messages_repository.dart';
 import 'package:inslate/sources/transaction_source.dart';
+import 'package:inslate/core/enums/record_subtype.dart';
+import 'package:inslate/models/activity_filter.dart';
+import 'package:inslate/models/financial_period.dart';
+import '../fixtures/mshwari_loan_messages.dart';
 
 class FakeTransactionSource implements TransactionSource {
   final List<domain.RawMessage> messages;
@@ -83,6 +87,49 @@ void main() {
   tearDown(() async {
     await database.close();
   });
+
+  test(
+    'imports production M-Shwari loan and queries Loans Activity without duplicates',
+    () async {
+      final message = domain.RawMessage(
+        id: 'SMS-MSHWARI-LOAN',
+        sender: 'MPESA',
+        body: mshwariApprovedLoan,
+        receivedAt: DateTime(2026, 10, 3, 0, 42),
+      );
+      expect((await importService.importMessages([message])).imported, 1);
+      final record = (await repository.getAllByReference('UJ3NY8KRG4')).single;
+      expect(record.subtype, RecordSubtype.loanDisbursement);
+      expect(record.party!.name, 'M-Shwari');
+      expect(record.amount, 3940);
+      final loanActivity = await repository.getActivity(
+        ActivityFilter(
+          period: FinancialPeriod.month(DateTime(2026, 10)),
+          scope: ActivityScope.loans,
+        ),
+      );
+      expect(loanActivity.single.reference, 'UJ3NY8KRG4');
+      expect((await importService.importMessages([message])).imported, 0);
+      expect(await repository.getAllByReference('UJ3NY8KRG4'), hasLength(1));
+    },
+  );
+
+  test(
+    'stored but unparsed M-Shwari loan is skipped before corrected classification',
+    () async {
+      final message = domain.RawMessage(
+        id: 'SMS-SKIPPED-MSHWARI',
+        sender: 'MPESA',
+        body: mshwariApprovedLoan,
+        receivedAt: DateTime(2026, 10, 3),
+      );
+      await rawMessagesRepository.save(message);
+      final result = await importService.importMessages([message]);
+      expect(result.skipped, 1);
+      expect(result.imported, 0);
+      expect(await repository.getAllByReference('UJ3NY8KRG4'), isEmpty);
+    },
+  );
 
   test('imports a real M-PESA send money message into SQLite', () async {
     final message = domain.RawMessage(

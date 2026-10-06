@@ -8,6 +8,7 @@ import '../sources/sms_transaction_source.dart';
 import 'repository_providers.dart';
 import 'source_providers.dart';
 import 'financial_records_provider.dart';
+import 'activity_provider.dart';
 import '../repositories/raw_messages_repository.dart';
 
 final importProvider = NotifierProvider<ImportNotifier, ImportProgress>(
@@ -62,6 +63,10 @@ class ImportNotifier extends Notifier<ImportProgress> {
 
       final result = await _importService.importFromSource(_smsSource);
 
+      if (result.imported > 0) {
+        _refreshActivity();
+      }
+
       state = ImportProgress(
         status: ImportStatus.completed,
         total: result.imported + result.skipped + result.failed,
@@ -98,6 +103,7 @@ class ImportNotifier extends Notifier<ImportProgress> {
         // A background SMS isolate may have written directly to the database
         // while the foreground Riverpod state was inactive.
         ref.invalidate(financialRecordsProvider);
+        _refreshActivity();
 
         return;
       }
@@ -116,6 +122,7 @@ class ImportNotifier extends Notifier<ImportProgress> {
       // Background SMS processing may already have persisted these messages,
       // causing catch-up to report them as skipped rather than imported.
       ref.invalidate(financialRecordsProvider);
+      _refreshActivity();
     } catch (e) {
       debugPrint('SMS CATCH-UP ERROR: $e');
     }
@@ -129,6 +136,7 @@ class ImportNotifier extends Notifier<ImportProgress> {
 
           if (result.imported > 0) {
             ref.invalidate(financialRecordsProvider);
+            _refreshActivity();
           }
         } catch (e) {
           if (kDebugMode) {
@@ -137,5 +145,9 @@ class ImportNotifier extends Notifier<ImportProgress> {
         }
       },
     );
+  }
+
+  void _refreshActivity() {
+    ref.read(financialDataRevisionProvider.notifier).state++;
   }
 }

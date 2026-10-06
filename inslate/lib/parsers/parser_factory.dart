@@ -9,6 +9,7 @@ import '/parsers/mpesa/account_transfer_parser.dart';
 import '/parsers/mpesa/fuliza_parser.dart';
 import '/parsers/mpesa/investment_parser.dart';
 import '/parsers/mpesa/airtime_parser.dart';
+import '/parsers/mpesa/mshwari_loan_parser.dart';
 
 class ParserFactory {
   ParserFactory._();
@@ -40,6 +41,10 @@ class ParserFactory {
       case RecordSubtype.fulizaLoan:
       case RecordSubtype.fulizaRepayment:
         return FulizaParser();
+
+      case RecordSubtype.loanDisbursement:
+      case RecordSubtype.loanRepayment:
+        return MshwariLoanParser();
 
       case RecordSubtype.investmentPurchase:
       case RecordSubtype.investmentRedemption:
