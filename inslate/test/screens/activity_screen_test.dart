@@ -237,4 +237,83 @@ void main() {
     );
     expect(find.text('+KSh 100.00'), findsOneWidget);
   });
+
+  testWidgets(
+    'counted pagination supports last, first, and validated page jump',
+    (tester) async {
+      repository.records = [
+        for (var i = 0; i < 123; i++)
+          record(RecordSubtype.sendMoney, i.toDouble()),
+      ];
+      await open(tester);
+      expect(find.text('123 transactions'), findsOneWidget);
+      expect(find.text('of 3 · Jump'), findsOneWidget);
+      await tester.tap(find.byTooltip('Last page'));
+      await tester.pumpAndSettle();
+      expect(find.text('Page 3'), findsOneWidget);
+      expect(
+        tester
+            .widget<IconButton>(
+              find.byWidgetPredicate(
+                (widget) =>
+                    widget is IconButton && widget.tooltip == 'Last page',
+              ),
+            )
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.byTooltip('First page'));
+      await tester.pumpAndSettle();
+      expect(find.text('Page 1'), findsOneWidget);
+      await tester.tap(find.text('of 3 · Jump'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField), '4');
+      await tester.tap(find.text('Go'));
+      await tester.pumpAndSettle();
+      expect(find.text('Enter a number from 1 to 3'), findsOneWidget);
+      await tester.enterText(find.byType(TextFormField), '2');
+      await tester.tap(find.text('Go'));
+      await tester.pumpAndSettle();
+      expect(find.text('Page 2'), findsOneWidget);
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Income'));
+      await tester.pumpAndSettle();
+      expect(find.text('0 transactions · 0 pages'), findsOneWidget);
+      expect(find.text('No pages'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'range selector offers presets and applies custom range without losing scope',
+    (tester) async {
+      await open(
+        tester,
+        filter: ActivityFilter(period: period, scope: ActivityScope.loans),
+      );
+      await tester.tap(find.byTooltip('Choose date range'));
+      await tester.pumpAndSettle();
+      expect(find.text('Last 30 days'), findsOneWidget);
+      await tester.tap(find.text('Custom date range'));
+      await tester.pumpAndSettle();
+      expect(find.text('Choose start and end dates'), findsOneWidget);
+      await tester.tap(find.text('Apply range'));
+      await tester.pumpAndSettle();
+      expect(repository.lastFilter!.period, period);
+      expect(repository.lastFilter!.scope, ActivityScope.loans);
+      await tester.tap(find.byTooltip('Choose date range'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Last 30 days'));
+      await tester.pumpAndSettle();
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      expect(
+        repository.lastFilter!.period.start,
+        DateTime(today.year, today.month, today.day - 29),
+      );
+      expect(
+        repository.lastFilter!.period.end,
+        DateTime(today.year, today.month, today.day + 1),
+      );
+      expect(repository.lastFilter!.scope, ActivityScope.loans);
+    },
+  );
 }

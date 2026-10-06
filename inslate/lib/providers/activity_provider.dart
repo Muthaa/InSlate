@@ -38,3 +38,11 @@ final activityMonthsProvider = FutureProvider.autoDispose<Set<DateTime>>((ref) {
   ref.watch(financialDataRevisionProvider);
   return ref.watch(financialRecordsRepositoryProvider).getEffectiveMonths();
 });
+
+final activityCountProvider = FutureProvider.autoDispose
+    .family<int, ActivityFilter>((ref, filter) {
+      ref.watch(financialDataRevisionProvider);
+      return ref
+          .watch(financialRecordsRepositoryProvider)
+          .countActivity(filter);
+    });

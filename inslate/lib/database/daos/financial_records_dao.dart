@@ -76,6 +76,16 @@ class FinancialRecordsDao extends DatabaseAccessor<AppDatabase>
   Future<List<FinancialRecord>> getRecordsForPeriod(FinancialPeriod period) =>
       getActivityCandidates(ActivityFilter(period: period));
 
+  Future<int> countActivityCandidates(ActivityFilter filter) async {
+    final count = financialRecords.id.count();
+    final row =
+        await (selectOnly(financialRecords)
+              ..addColumns([count])
+              ..where(_activityPredicate(filter)))
+            .getSingle();
+    return row.read(count) ?? 0;
+  }
+
   /// Period, subtype, movement class, account family and direction are filtered
   /// in SQL. The repository resolves optional party identities before result
   /// pagination. ID makes equal-date ordering deterministic.

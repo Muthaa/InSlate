@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
 import '../../core/enums/account_type.dart';
 import '../../core/presentation/financial_presentation.dart';
 import '../../core/theme/app_theme.dart';
@@ -79,6 +80,76 @@ class _ActivityContentState extends ConsumerState<ActivityContent> {
   }
 
   Future<void> _selectRange(Set<DateTime> months) async {
+    final preset = await showModalBottomSheet<_PeriodPreset>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Choose your period',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.darkBlue,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Currently: ${periodLabel(_filter.period)}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                for (final choice in _PeriodPreset.values)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      choice == _PeriodPreset.custom
+                          ? Icons.date_range_outlined
+                          : Icons.calendar_month_outlined,
+                      color: AppTheme.teal,
+                    ),
+                    title: Text(switch (choice) {
+                      _PeriodPreset.thisMonth => 'This month',
+                      _PeriodPreset.lastMonth => 'Last month',
+                      _PeriodPreset.last30Days => 'Last 30 days',
+                      _PeriodPreset.custom => 'Custom date range',
+                    }),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => Navigator.pop(context, choice),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (preset == null || !mounted) return;
+    if (preset != _PeriodPreset.custom) {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final selected = switch (preset) {
+        _PeriodPreset.thisMonth => FinancialPeriod.month(today),
+        _PeriodPreset.lastMonth => FinancialPeriod.month(
+          DateTime(now.year, now.month - 1),
+        ),
+        _PeriodPreset.last30Days => FinancialPeriod(
+          DateTime(today.year, today.month, today.day - 29),
+          DateTime(today.year, today.month, today.day + 1),
+        ),
+        _PeriodPreset.custom => throw StateError(
+          'Custom range handled separately',
+        ),
+      };
+      _changeFilter(_filter.withPeriod(selected));
+      return;
+    }
     final now = DateTime.now();
     final earliest = [...months, _filter.period.start, now]..sort();
     final latest = [
@@ -88,6 +159,19 @@ class _ActivityContentState extends ConsumerState<ActivityContent> {
     ]..sort();
     final range = await showDateRangePicker(
       context: context,
+      helpText: 'Choose start and end dates',
+      saveText: 'Apply range',
+      fieldStartLabelText: 'Start date',
+      fieldEndLabelText: 'End date',
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: AppTheme.teal,
+          ).copyWith(primary: AppTheme.darkBlue, surface: Colors.white),
+          scaffoldBackgroundColor: Colors.white,
+        ),
+        child: child!,
+      ),
       firstDate: earliest.first,
       lastDate: latest.last,
       initialDateRange: DateTimeRange(
@@ -104,6 +188,64 @@ class _ActivityContentState extends ConsumerState<ActivityContent> {
           ),
         ),
       );
+    }
+  }
+
+  void _goToPage(int page) {
+    setState(() => _page = page);
+    _scrollToTop();
+  }
+
+  Future<void> _choosePage(int pages) async {
+    var pageInput = '${_page + 1}';
+    final form = GlobalKey<FormState>();
+    final selected = await showDialog<int>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Go to page'),
+        content: Form(
+          key: form,
+          child: TextFormField(
+            initialValue: pageInput,
+            onChanged: (value) => pageInput = value,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: InputDecoration(
+              labelText: 'Page number',
+              helperText: 'Choose a page from 1 to $pages',
+            ),
+            validator: (value) {
+              final page = int.tryParse(value ?? '');
+              return page == null || page < 1 || page > pages
+                  ? 'Enter a number from 1 to $pages'
+                  : null;
+            },
+            onFieldSubmitted: (_) {
+              if (form.currentState!.validate()) {
+                Navigator.pop(context, int.parse(pageInput) - 1);
+              }
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (form.currentState!.validate()) {
+                Navigator.pop(context, int.parse(pageInput) - 1);
+              }
+            },
+            child: const Text('Go'),
+          ),
+        ],
+      ),
+    );
+    if (mounted && selected != null) {
+      _goToPage(selected);
     }
   }
 
@@ -124,6 +266,11 @@ class _ActivityContentState extends ConsumerState<ActivityContent> {
     }.toList()..sort((a, b) => b.start.compareTo(a.start));
     final query = (filter: _filter, page: _page);
     final pageAsync = ref.watch(activityPageProvider(query));
+    final countAsync = ref.watch(activityCountProvider(_filter));
+    final total = countAsync.asData?.value;
+    final totalPages = total == null
+        ? null
+        : (total + activityPageSize - 1) ~/ activityPageSize;
     final centralLabel = accountLabel(_filter.central.type);
     final hasDetailedFilter =
         _filter.partyPresence != null ||
@@ -496,38 +643,122 @@ class _ActivityContentState extends ConsumerState<ActivityContent> {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: const Color(0xFFE8ECEF)),
             ),
-            child: Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                TextButton(
-                  onPressed: _page == 0 || pageAsync.isLoading
-                      ? null
-                      : () {
-                          setState(() => _page--);
-                          _scrollToTop();
-                        },
-                  child: const Text('Previous'),
-                ),
-                Expanded(
-                  child: Text(
-                    'Page ${_page + 1}',
-                    textAlign: TextAlign.center,
+                if (countAsync.hasError)
+                  TextButton(
+                    onPressed: () =>
+                        ref.invalidate(activityCountProvider(_filter)),
+                    child: const Text('Unable to count transactions. Retry'),
+                  )
+                else
+                  Text(
+                    total == null
+                        ? 'Counting transactions…'
+                        : '$total transactions${totalPages == 0 ? ' · 0 pages' : ''}',
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       color: AppTheme.darkBlue,
-                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                ),
                 TextButton(
                   onPressed:
-                      pageAsync.isLoading ||
-                          !(pageAsync.valueOrNull?.hasMore ?? false)
+                      totalPages == null ||
+                          totalPages <= 1 ||
+                          pageAsync.isLoading
                       ? null
-                      : () {
-                          setState(() => _page++);
-                          _scrollToTop();
-                        },
-                  child: const Text('Next'),
+                      : () => _choosePage(totalPages),
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 6,
+                    children: [
+                      Text(
+                        totalPages == 0 ? 'No pages' : 'Page ${_page + 1}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.darkBlue,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (totalPages != null && totalPages > 0)
+                        Text(
+                          totalPages > 1
+                              ? 'of $totalPages · Jump'
+                              : 'of $totalPages',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                    ],
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      tooltip: 'First page',
+                      icon: const Icon(Icons.first_page_rounded),
+                      onPressed: _page == 0 || pageAsync.isLoading
+                          ? null
+                          : () => _goToPage(0),
+                    ),
+                    Expanded(
+                      child: TextButton(
+                        onPressed: _page == 0 || pageAsync.isLoading
+                            ? null
+                            : () {
+                                setState(() => _page--);
+                                _scrollToTop();
+                              },
+                        style: TextButton.styleFrom(
+                          minimumSize: Size.zero,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 12,
+                          ),
+                          textStyle: const TextStyle(fontSize: 12),
+                        ),
+                        child: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text('Previous'),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: TextButton(
+                        onPressed:
+                            pageAsync.isLoading ||
+                                !(pageAsync.valueOrNull?.hasMore ?? false)
+                            ? null
+                            : () {
+                                setState(() => _page++);
+                                _scrollToTop();
+                              },
+                        style: TextButton.styleFrom(
+                          minimumSize: Size.zero,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 12,
+                          ),
+                          textStyle: const TextStyle(fontSize: 12),
+                        ),
+                        child: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text('Next'),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Last page',
+                      icon: const Icon(Icons.last_page_rounded),
+                      onPressed:
+                          totalPages == null ||
+                              totalPages <= 1 ||
+                              _page >= totalPages - 1 ||
+                              pageAsync.isLoading
+                          ? null
+                          : () => _goToPage(totalPages - 1),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -537,6 +768,8 @@ class _ActivityContentState extends ConsumerState<ActivityContent> {
     );
   }
 }
+
+enum _PeriodPreset { thisMonth, lastMonth, last30Days, custom }
 
 class _ActivityEmptyState extends StatelessWidget {
   final IconData icon;

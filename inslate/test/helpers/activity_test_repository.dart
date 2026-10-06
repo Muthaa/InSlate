@@ -70,6 +70,13 @@ class ActivityTestRepository extends FinancialRecordsRepository {
   }
 
   @override
+  Future<int> countActivity(ActivityFilter filter) async {
+    await pendingRead;
+    if (fail) throw StateError('Test query failure');
+    return records.where(filter.matches).length;
+  }
+
+  @override
   Future<Set<DateTime>> getEffectiveMonths() async {
     monthReads++;
     return records.map((record) {

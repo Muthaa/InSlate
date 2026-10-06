@@ -162,6 +162,39 @@ class FinancialRecordsRepository {
 
   Future<Set<DateTime>> getEffectiveMonths() =>
       database.financialRecordsDao.getEffectiveMonths();
+
+  /// Count the same filtered dataset as Activity without retaining full history.
+  Future<int> countActivity(ActivityFilter filter) async {
+    if (filter.party == null && filter.endpoint?.identity == null) {
+      return database.financialRecordsDao.countActivityCandidates(filter);
+    }
+    final candidates = ActivityFilter(
+      period: filter.period,
+      scope: filter.scope,
+      subtype: filter.subtype,
+      partyPresence: filter.partyPresence,
+      resolution: filter.resolution,
+      direction: filter.direction,
+      central: filter.central,
+      endpoint: filter.endpoint == null
+          ? null
+          : AccountEndpoint(filter.endpoint!.type),
+    );
+    var count = 0;
+    var offset = 0;
+    const batchSize = 100;
+    while (true) {
+      final rows = await database.financialRecordsDao.getActivityCandidates(
+        candidates,
+        limit: batchSize,
+        offset: offset,
+      );
+      count += rows.map(_toDomain).where(filter.matches).length;
+      if (rows.length < batchSize) return count;
+      offset += rows.length;
+    }
+  }
+
   Future<({DateTime? first, DateTime? last})> getEffectiveDateBounds() =>
       database.financialRecordsDao.getEffectiveDateBounds();
 

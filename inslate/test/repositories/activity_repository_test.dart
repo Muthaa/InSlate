@@ -22,6 +22,65 @@ void main() {
   tearDown(() => database.close());
 
   test(
+    'Activity counts reconcile with paginated filters including identity batches',
+    () async {
+      final period = FinancialPeriod.month(DateTime(2026, 9));
+      const alice = Party(
+        name: 'ALICE',
+        type: PartyType.person,
+        identifier: ' Alice-ID ',
+      );
+      await repository.saveAll([
+        for (var i = 0; i < 205; i++)
+          record(
+            RecordSubtype.sendMoney,
+            i.toDouble(),
+            party: i.isEven
+                ? alice
+                : const Party(name: 'Bob', type: PartyType.person),
+          ),
+        record(RecordSubtype.receiveMoney, 12, party: alice),
+        record(RecordSubtype.mshwariDeposit, 50),
+        record(RecordSubtype.fulizaLoan, 100),
+        record(RecordSubtype.sendMoney, 999, party: alice, date: period.end),
+      ]);
+      for (final filter in [
+        ActivityFilter(period: period),
+        ActivityFilter(period: period, scope: ActivityScope.expenses),
+        ActivityFilter(period: period, scope: ActivityScope.loans),
+        ActivityFilter(period: period, party: PartyIdentity.fromParty(alice)),
+        ActivityFilter(
+          period: period,
+          scope: ActivityScope.expenses,
+          party: PartyIdentity.fromParty(alice),
+        ),
+        ActivityFilter(
+          period: period,
+          direction: TransferDirection.fromCentral,
+          scope: ActivityScope.internalTransfers,
+        ),
+        ActivityFilter(period: FinancialPeriod.month(DateTime(2025, 1))),
+      ]) {
+        final all = await repository.getActivity(filter);
+        expect(await repository.countActivity(filter), all.length);
+        if (all.isNotEmpty) {
+          final lastOffset = ((all.length - 1) ~/ 50) * 50;
+          expect(
+            await repository.getActivity(filter, offset: lastOffset, limit: 50),
+            hasLength(all.length - lastOffset),
+          );
+        }
+      }
+      expect(
+        await repository.countActivity(
+          ActivityFilter(period: period, party: PartyIdentity.fromParty(alice)),
+        ),
+        104,
+      );
+    },
+  );
+
+  test(
     'period uses transaction date or fallback and excludes next month',
     () async {
       final period = FinancialPeriod.month(DateTime(2026, 12));
