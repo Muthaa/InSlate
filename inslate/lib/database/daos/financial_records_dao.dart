@@ -18,6 +18,13 @@ class FinancialRecordsDao extends DatabaseAccessor<AppDatabase>
     return select(financialRecords).get();
   }
 
+  Expression<String> get _interpretedType => CustomExpression<String>(
+    FinancialSemantics.effectiveTypeSql('financial_records'),
+  );
+  Expression<String> get _interpretedSubtype => CustomExpression<String>(
+    FinancialSemantics.effectiveSubtypeSql('financial_records'),
+  );
+
   Expression<DateTime> get _effectiveDate => const CustomExpression<DateTime>(
     'COALESCE(transaction_date, received_at)',
   );
@@ -26,6 +33,47 @@ class FinancialRecordsDao extends DatabaseAccessor<AppDatabase>
     Expression<bool> predicate =
         _effectiveDate.isBiggerOrEqualValue(filter.period.start) &
         _effectiveDate.isSmallerThanValue(filter.period.end);
+    if (filter.category != null) {
+      final assignments = db.recordCategoryAssignments;
+      final categorized = db.selectOnly(assignments)
+        ..addColumns([assignments.financialRecordId])
+        ..where(
+          assignments.financialRecordId.equalsExp(
+                CustomExpression<int>(
+                  FinancialSemantics.categoryRecordSql('financial_records'),
+                ),
+              ) &
+              (filter.category!.categoryId == null
+                  ? assignments.categoryId.isNotNull()
+                  : assignments.categoryId.equals(
+                      filter.category!.categoryId!,
+                    )),
+        );
+      final membership = existsQuery(categorized);
+      predicate =
+          predicate &
+          (filter.category!.categoryId == null ? membership.not() : membership);
+    }
+    if (filter.search.isNotEmpty) {
+      // INSTR is literal substring matching: %, _ and quotes are not wildcards.
+      Expression<bool> search = const Constant(false);
+      for (final column in [
+        financialRecords.partyName,
+        financialRecords.title,
+        financialRecords.reference,
+        financialRecords.partyPhone,
+        financialRecords.partyAccount,
+        financialRecords.partyIdentifier,
+      ]) {
+        search =
+            search |
+            FunctionCallExpression<int>('instr', [
+              FunctionCallExpression<String>('lower', [column]),
+              Variable<String>(filter.search),
+            ]).isBiggerThanValue(0);
+      }
+      predicate = predicate & search;
+    }
     final subtypes = RecordSubtype.values.where(filter.acceptsSubtype).toList();
     if (filter.partyPresence != null) {
       predicate =
@@ -41,8 +89,8 @@ class FinancialRecordsDao extends DatabaseAccessor<AppDatabase>
         if (expected != null) {
           resolved =
               resolved |
-              (financialRecords.subtype.equals(subtype.name) &
-                  financialRecords.type.equals(expected.name));
+              (_interpretedSubtype.equals(subtype.name) &
+                  _interpretedType.equals(expected.name));
         }
       }
       predicate =
@@ -58,17 +106,15 @@ class FinancialRecordsDao extends DatabaseAccessor<AppDatabase>
         if (policy.expectedType != null) {
           membership =
               membership |
-              (financialRecords.subtype.equals(subtype.name) &
-                  financialRecords.type.equals(policy.expectedType!.name));
+              (_interpretedSubtype.equals(subtype.name) &
+                  _interpretedType.equals(policy.expectedType!.name));
         }
       }
       predicate = predicate & membership;
-    } else if (filter.subtype != null) {
+    } else if (filter.subtype != null || filter.provider?.unspecified == true) {
       predicate =
           predicate &
-          financialRecords.subtype.isIn(
-            subtypes.map((subtype) => subtype.name),
-          );
+          _interpretedSubtype.isIn(subtypes.map((subtype) => subtype.name));
     }
     return predicate;
   }
@@ -106,6 +152,60 @@ class FinancialRecordsDao extends DatabaseAccessor<AppDatabase>
     if (limit != null) query.limit(limit, offset: offset);
     if (limit == null && offset > 0) query.limit(-1, offset: offset);
     return query.get();
+  }
+
+  Expression<bool> _instrumentMembership(int accountId) =>
+      financialRecords.sourceAccountId.equals(accountId) |
+      financialRecords.destinationAccountId.equals(accountId);
+
+  Expression<bool> _instrumentPeriod(int accountId, FinancialPeriod period) =>
+      _instrumentMembership(accountId) &
+      _effectiveDate.isBiggerOrEqualValue(period.start) &
+      _effectiveDate.isSmallerThanValue(period.end);
+
+  Future<int> countInstrumentRecords(
+    int accountId,
+    FinancialPeriod period,
+  ) async {
+    final count = financialRecords.id.count();
+    final row =
+        await (selectOnly(financialRecords)
+              ..addColumns([count])
+              ..where(_instrumentPeriod(accountId, period)))
+            .getSingle();
+    return row.read(count) ?? 0;
+  }
+
+  Future<List<FinancialRecord>> getInstrumentRecords(
+    int accountId,
+    FinancialPeriod period, {
+    required int limit,
+    required int offset,
+  }) {
+    if (limit <= 0 || limit > 50 || offset < 0) {
+      throw ArgumentError('Invalid instrument page bounds');
+    }
+    return (select(financialRecords)
+          ..where((_) => _instrumentPeriod(accountId, period))
+          ..orderBy([
+            (_) => OrderingTerm.desc(_effectiveDate),
+            (r) => OrderingTerm.desc(r.id),
+          ])
+          ..limit(limit, offset: offset))
+        .get();
+  }
+
+  /// Only month keys cross the database boundary, never unbounded record rows.
+  Future<Set<DateTime>> getInstrumentMonths(int accountId) async {
+    const month = CustomExpression<String>(
+      "strftime('%Y-%m-01', COALESCE(transaction_date, received_at), 'unixepoch', 'localtime')",
+    );
+    final rows =
+        await (selectOnly(financialRecords, distinct: true)
+              ..addColumns([month])
+              ..where(_instrumentMembership(accountId)))
+            .get();
+    return rows.map((r) => DateTime.parse(r.read(month)!)).toSet();
   }
 
   Future<({DateTime? first, DateTime? last})> getEffectiveDateBounds() async {

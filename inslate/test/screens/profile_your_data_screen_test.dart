@@ -1,0 +1,308 @@
+import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:inslate/database/app_database.dart';
+import 'package:inslate/models/import_progress.dart';
+import 'package:inslate/models/raw_message.dart' as domain;
+import 'package:inslate/providers/database_provider.dart';
+import 'package:inslate/providers/app_preferences_provider.dart';
+import 'package:inslate/services/app_preferences.dart';
+import 'package:inslate/providers/import_provider.dart';
+import 'package:inslate/providers/your_data_provider.dart';
+import 'package:inslate/repositories/raw_messages_repository.dart';
+import 'package:inslate/screens/profile/profile_screen.dart';
+import 'package:inslate/screens/profile/your_data_screen.dart';
+
+class TestImporter extends ImportNotifier {
+  static int importRequests = 0;
+  @override
+  Future<void> importMessages() async {
+    importRequests++;
+    state = const ImportProgress(status: ImportStatus.processing, total: 10);
+  }
+
+  @override
+  ImportProgress build() => const ImportProgress(
+    status: ImportStatus.completed,
+    total: 10,
+    processed: 10,
+    imported: 3,
+    skipped: 4,
+    duplicate: 2,
+    failed: 1,
+    rawCreated: 8,
+    evidenceCreated: 5,
+    reasons: {'PARSE_FAILED': 1},
+  );
+}
+
+class FailingNamePreferences extends AppPreferences {
+  FailingNamePreferences(super.preferences);
+  @override
+  Future<void> setLocalDisplayName(String value) async =>
+      throw StateError('Private storage details');
+}
+
+void main() {
+  late AppDatabase db;
+  setUp(() {
+    db = AppDatabase.forTesting(NativeDatabase.memory());
+    SharedPreferences.setMockInitialValues({});
+    TestImporter.importRequests = 0;
+  });
+  void testUi(String name, Future<void> Function(WidgetTester) body) {
+    testWidgets(name, (tester) async {
+      try {
+        await body(tester);
+      } finally {
+        await tester.pump(Duration.zero);
+        await tester.runAsync(() => db.close());
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      }
+    });
+  }
+
+  Future<void> open(WidgetTester tester, Widget screen) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          databaseProvider.overrideWithValue(db),
+          importProvider.overrideWith(TestImporter.new),
+        ],
+        child: MaterialApp(home: screen),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  testUi(
+    'Profile persists optional local name without duplicate data navigation',
+    (tester) async {
+      await open(tester, const ProfileScreen());
+      expect(find.textContaining('no online account'), findsOneWidget);
+      await tester.tap(find.text('Add a local display name'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField), '  Alex  ');
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      expect(find.text('Alex'), findsOneWidget);
+      expect(
+        (await SharedPreferences.getInstance()).getString('local_display_name'),
+        'Alex',
+      );
+      await tester.tap(find.text('Alex'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField), '');
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      expect(find.text('Add a local display name'), findsOneWidget);
+      expect(find.text('Your Data'), findsNothing);
+    },
+  );
+  testUi(
+    'Your Data shows real counts, live updates and no sensitive SMS content',
+    (tester) async {
+      await open(tester, const YourDataScreen());
+      expect(find.text('Financial records: 0'), findsOneWidget);
+      await tester.runAsync(
+        () => RawMessagesRepository(db).save(
+          domain.RawMessage(
+            id: 'private-id',
+            sender: '0712345678',
+            body: 'PRIVATE SMS BODY',
+            receivedAt: DateTime.utc(2026),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Raw SMS messages: 1'), findsOneWidget);
+      expect(find.text('Financial records: 0'), findsOneWidget);
+      expect(find.textContaining('PRIVATE SMS BODY'), findsNothing);
+      expect(find.textContaining('0712345678'), findsNothing);
+      await tester.scrollUntilVisible(
+        find.text('Import status (this session)'),
+        250,
+      );
+      expect(find.text('10 SMS checked'), findsOneWidget);
+      for (final outcome in {
+        'Imported': 3,
+        'Skipped': 4,
+        'Duplicate': 2,
+        'Failed': 1,
+      }.entries) {
+        expect(
+          find.descendant(
+            of: find
+                .ancestor(
+                  of: find.text(outcome.key),
+                  matching: find.byType(Container),
+                )
+                .first,
+            matching: find.text('${outcome.value}'),
+          ),
+          findsOneWidget,
+        );
+      }
+      expect(find.textContaining('not lifetime totals'), findsOneWidget);
+      expect(
+        find.text('Import finished with failures requiring review.'),
+        findsOneWidget,
+      );
+      expect(find.text('8 new stored SMS'), findsOneWidget);
+      expect(find.text('5 new balance observations'), findsOneWidget);
+      await tester.ensureVisible(find.text('Outcome details'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Outcome details'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Recognized messages that could not be parsed'),
+        findsOneWidget,
+      );
+      await tester.ensureVisible(find.text('Reconcile SMS inbox'));
+      await tester.pumpAndSettle();
+      expect(find.text('Reconcile SMS inbox').hitTestable(), findsOneWidget);
+      await tester.tap(find.text('Reconcile SMS inbox'));
+      await tester.pumpAndSettle();
+      expect(TestImporter.importRequests, 1);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find
+                  .ancestor(
+                    of: find.text('Reconcile SMS inbox'),
+                    matching: find.byWidgetPredicate(
+                      (widget) => widget is FilledButton,
+                    ),
+                  )
+                  .first,
+            )
+            .onPressed,
+        isNull,
+      );
+    },
+  );
+  testUi('Your Data retains counts without duplicate management routes', (
+    tester,
+  ) async {
+    await open(tester, const YourDataScreen());
+    await tester.tap(find.text('Financial records: 0'));
+    await tester.pumpAndSettle();
+    expect(find.text('Your financial timeline'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    for (final label in [
+      'Categories:',
+      'Categorization rules: 0',
+      'Registered financial instruments: 0',
+      'Balance observations: 0',
+    ]) {
+      await tester.scrollUntilVisible(find.textContaining(label), 150);
+      await tester.pumpAndSettle();
+      final tile = tester.widget<ListTile>(
+        find.ancestor(of: find.textContaining(label), matching: find.byType(ListTile)),
+      );
+      expect(tile.onTap, isNull);
+      expect(tile.trailing, isNull);
+    }
+    await tester.scrollUntilVisible(
+      find.text('SMS balance observations: 0'),
+      200,
+    );
+    await tester.tap(find.text('SMS balance observations: 0'));
+    await tester.pumpAndSettle();
+    expect(find.byType(YourDataScreen, skipOffstage: false), findsOneWidget);
+    expect(find.text('0 SMS observations'), findsOneWidget);
+  });
+  testUi('count failures provide a retry without exposing exception content', (
+    tester,
+  ) async {
+    var requests = 0;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          importProvider.overrideWith(TestImporter.new),
+          yourDataSummaryProvider.overrideWith((ref) {
+            requests++;
+            return Stream.error(StateError('PRIVATE DATABASE PATH'));
+          }),
+        ],
+        child: const MaterialApp(home: YourDataScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Unable to load stored data counts.'), findsOneWidget);
+    expect(find.textContaining('PRIVATE DATABASE PATH'), findsNothing);
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+    expect(requests, 2);
+  });
+  testUi('SMS metadata navigation paginates without revealing source content', (
+    tester,
+  ) async {
+    await tester.runAsync(
+      () => RawMessagesRepository(db).saveAll(
+        List.generate(
+          51,
+          (i) => domain.RawMessage(
+            id: 'sms-$i',
+            sender: '0712345678',
+            body: 'PRIVATE SMS BODY',
+            receivedAt: DateTime.utc(2026),
+          ),
+        ),
+      ),
+    );
+    await open(tester, const YourDataScreen());
+    await tester.tap(find.text('Raw SMS messages: 51'));
+    await tester.pumpAndSettle();
+    expect(find.text('51 stored messages'), findsOneWidget);
+    expect(find.textContaining('PRIVATE SMS BODY'), findsNothing);
+    expect(find.textContaining('0712345678'), findsNothing);
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+    expect(find.text('Page 2'), findsOneWidget);
+    expect(find.text('Stored SMS'), findsOneWidget);
+    expect(
+      tester
+          .widget<TextButton>(find.widgetWithText(TextButton, 'Next'))
+          .onPressed,
+      isNull,
+    );
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('Raw SMS messages: 51'), findsOneWidget);
+  });
+  testUi(
+    'name persistence failure retains user input and does not expose errors',
+    (tester) async {
+      final preferences = FailingNamePreferences(
+        await SharedPreferences.getInstance(),
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appPreferencesProvider.overrideWith((ref) async => preferences),
+          ],
+          child: const MaterialApp(home: ProfileScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add a local display name'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField), 'Keep my input');
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Unable to save name. Please try again.'),
+        findsOneWidget,
+      );
+      expect(find.text('Keep my input'), findsOneWidget);
+      expect(find.textContaining('Private storage details'), findsNothing);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+    },
+  );
+}

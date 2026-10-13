@@ -193,6 +193,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
         const SizedBox(height: 20),
         Text('Imported: ${progress.imported}'),
         Text('Skipped: ${progress.skipped}'),
+        Text('Duplicate: ${progress.duplicate}'),
         Text('Failed: ${progress.failed}'),
       ],
     );
@@ -209,7 +210,9 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
         Icon(Icons.check_circle_rounded, size: 72, color: colors.primary),
         const SizedBox(height: 24),
         Text(
-          'Your finances are ready',
+          progress.failed > 0
+              ? 'Import needs review'
+              : 'Your finances are ready',
           textAlign: TextAlign.center,
           style: theme.textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.bold,
@@ -221,6 +224,14 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
           'We imported ${progress.imported} transactions.',
           textAlign: TextAlign.center,
           style: theme.textTheme.bodyLarge,
+        ),
+        Text(
+          '${progress.total} SMS encountered: ${progress.skipped} skipped, '
+          '${progress.duplicate} duplicate, ${progress.failed} failed.',
+        ),
+        Text(
+          '${progress.rawCreated} new stored SMS; '
+          '${progress.evidenceCreated} new balance observations.',
         ),
       ],
     );

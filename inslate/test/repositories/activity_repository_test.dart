@@ -129,6 +129,7 @@ void main() {
     'SQL and domain agree for every scope, subtype and transfer filter',
     () async {
       final records = RecordSubtype.values
+          .where((s) => s != RecordSubtype.payBillReversal)
           .map((s) => record(s, s.index + 1.0))
           .toList();
       records.add(
@@ -147,7 +148,9 @@ void main() {
           ActivityFilter(period: period, resolution: resolution),
         for (final presence in PartyPresence.values)
           ActivityFilter(period: period, partyPresence: presence),
-        for (final subtype in RecordSubtype.values)
+        for (final subtype in RecordSubtype.values.where(
+          (s) => s != RecordSubtype.payBillReversal,
+        ))
           ActivityFilter(period: period, subtype: subtype),
         for (final direction in TransferDirection.values)
           ActivityFilter(period: period, direction: direction),

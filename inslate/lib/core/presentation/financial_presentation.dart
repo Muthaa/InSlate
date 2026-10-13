@@ -8,7 +8,19 @@ import '../../services/financial_semantics.dart';
 
 String formatMoney(double amount) =>
     NumberFormat.currency(symbol: 'KSh ', decimalDigits: 2).format(amount);
+
+/// Exact KES presentation, matching the app's currency style without converting
+/// integer minor units to floating point (including amounts beyond 2^53).
+String formatKesMinor(BigInt amount) {
+  final digits = amount.abs().toString().padLeft(3, '0');
+  final whole = digits
+      .substring(0, digits.length - 2)
+      .replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
+  return '${amount.isNegative ? '-' : ''}KSh $whole.${digits.substring(digits.length - 2)}';
+}
+
 String periodLabel(FinancialPeriod period) {
+  if (period == FinancialPeriod.allTime()) return 'All time';
   if (period == FinancialPeriod.month(period.start)) {
     return DateFormat.yMMMM().format(period.start);
   }
@@ -38,12 +50,17 @@ String accountLabel(AccountType type) => switch (type) {
 };
 
 String subtypeLabel(RecordSubtype subtype) => switch (subtype) {
+  RecordSubtype.registeredSavingsDeposit => 'Savings deposit',
+  RecordSubtype.registeredSavingsWithdrawal => 'Savings withdrawal',
+  RecordSubtype.instrumentPayment => 'Instrument payment out',
+  RecordSubtype.instrumentReceipt => 'Instrument payment in',
   RecordSubtype.sendMoney => 'Send money',
   RecordSubtype.receiveMoney => 'Receive money',
   RecordSubtype.withdrawal => 'Cash withdrawal',
   RecordSubtype.deposit => 'Cash deposit',
   RecordSubtype.buyGoods => 'Buy goods',
   RecordSubtype.payBill => 'PayBill',
+  RecordSubtype.payBillReversal => 'PayBill reversal',
   RecordSubtype.mshwariDeposit => 'M-Shwari deposit',
   RecordSubtype.mshwariWithdrawal => 'M-Shwari withdrawal',
   RecordSubtype.kcbDeposit => 'KCB M-PESA deposit',
@@ -78,11 +95,29 @@ class TransactionPresentation {
     AccountEndpoint central = const AccountEndpoint(AccountType.mpesa),
   }) {
     const semantics = FinancialSemantics();
+    if (record.subtype == RecordSubtype.instrumentPayment ||
+        record.subtype == RecordSubtype.instrumentReceipt) {
+      final incoming = record.subtype == RecordSubtype.instrumentReceipt;
+      return TransactionPresentation(
+        incoming
+            ? 'Payment in · purpose unspecified'
+            : 'Payment out · purpose unspecified',
+        incoming ? '+' : '-',
+        MovementClass.unresolved,
+      );
+    }
     final kind = semantics.classify(record);
     switch (kind) {
       case MovementClass.income:
         return TransactionPresentation('Income · received', '+', kind);
       case MovementClass.expense:
+        if (FinancialSemantics.isExpenseReversal(record)) {
+          return TransactionPresentation(
+            'Expense reversal · principal returned',
+            '+',
+            kind,
+          );
+        }
         return TransactionPresentation('Expense · sent', '−', kind);
       case MovementClass.loanBorrowing:
         return TransactionPresentation('Borrowed · loan principal', '', kind);

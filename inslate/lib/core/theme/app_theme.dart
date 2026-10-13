@@ -30,6 +30,21 @@ class AppTheme {
 
       scaffoldBackgroundColor: appBackground,
 
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: appBackground,
+        surfaceTintColor: Colors.transparent,
+        showDragHandle: true,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+      ),
+
+      popupMenuTheme: PopupMenuThemeData(
+        color: cardBackground,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+
       appBarTheme: const AppBarTheme(
         backgroundColor: appBackground,
         foregroundColor: darkBlue,

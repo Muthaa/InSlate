@@ -27,14 +27,18 @@ class ImportLogger {
     return _logFile!;
   }
 
-  static Future<void> write(String message) async {
+  static Future<void> write(String message) => writeAll([message]);
+
+  /// One flush per bounded import batch, with a timestamp on every audit line.
+  static Future<void> writeAll(List<String> messages) async {
+    if (messages.isEmpty) return;
     try {
       final file = await _getLogFile();
 
       final timestamp = DateTime.now().toIso8601String();
 
       await file.writeAsString(
-        '[$timestamp] $message\n',
+        messages.map((message) => '[$timestamp] $message\n').join(),
         mode: FileMode.append,
         flush: true,
       );

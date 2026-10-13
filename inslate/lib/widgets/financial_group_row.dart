@@ -9,6 +9,8 @@ class FinancialGroupRow extends StatelessWidget {
   final bool showShare;
   final bool compact;
   final Color? accentColor;
+  final TextStyle? labelStyle;
+  final TextStyle? amountStyle;
   const FinancialGroupRow({
     super.key,
     required this.group,
@@ -16,6 +18,8 @@ class FinancialGroupRow extends StatelessWidget {
     this.showShare = false,
     this.compact = false,
     this.accentColor,
+    this.labelStyle,
+    this.amountStyle,
   });
 
   @override
@@ -35,11 +39,13 @@ class FinancialGroupRow extends StatelessWidget {
                   children: [
                     Text(
                       group.label,
-                      style: TextStyle(
-                        fontSize: compact ? 13 : null,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF0B1F3A),
-                      ),
+                      style:
+                          labelStyle ??
+                          TextStyle(
+                            fontSize: compact ? 13 : null,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF0B1F3A),
+                          ),
                     ),
                     if (group.detail != null)
                       Text(
@@ -60,11 +66,13 @@ class FinancialGroupRow extends StatelessWidget {
                 child: Text(
                   formatMoney(group.amount),
                   textAlign: TextAlign.end,
-                  style: TextStyle(
-                    fontSize: compact ? 13 : null,
-                    fontWeight: FontWeight.w800,
-                    color: accentColor ?? const Color(0xFF0B1F3A),
-                  ),
+                  style:
+                      amountStyle ??
+                      TextStyle(
+                        fontSize: compact ? 13 : null,
+                        fontWeight: FontWeight.w800,
+                        color: accentColor ?? const Color(0xFF0B1F3A),
+                      ),
                 ),
               ),
               const Icon(Icons.chevron_right_rounded, size: 18),

@@ -30,4 +30,9 @@ enum RecordSubtype {
   billPayment,
 
   unknown,
+  payBillReversal,
+  registeredSavingsDeposit,
+  registeredSavingsWithdrawal,
+  instrumentPayment,
+  instrumentReceipt,
 }

@@ -106,7 +106,11 @@ void main() {
       );
       expect(
         summary.totalExpenses,
-        item.type == FinancialRecordType.expense ? 11 : 0,
+        item.type == FinancialRecordType.reversal
+            ? -9
+            : item.type == FinancialRecordType.expense
+            ? 11
+            : 0,
         reason: subtype.name,
       );
       expect(summary.totalFees, 1, reason: subtype.name);

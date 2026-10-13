@@ -6,6 +6,8 @@ class FinancialRecordTypeMapper {
 
   static FinancialRecordType fromSubtype(RecordSubtype subtype) {
     switch (subtype) {
+      case RecordSubtype.payBillReversal:
+        return FinancialRecordType.reversal;
       // Expense subtypes
       case RecordSubtype.sendMoney:
       case RecordSubtype.buyGoods:

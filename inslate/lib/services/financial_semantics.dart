@@ -105,20 +105,23 @@ class SubtypeSemantics {
   final FinancialRecordType? expectedType;
   final AccountType? source;
   final AccountType? destination;
+  final bool registeredSavings;
   const SubtypeSemantics(
     this.movement,
     this.expectedType, {
     this.source,
     this.destination,
+    this.registeredSavings = false,
   });
   bool get isSavingsOrInvestment =>
       movement == MovementClass.internalTransfer &&
-      [source, destination].any(
-        (type) =>
-            type == AccountType.mshwariSavings ||
-            type == AccountType.kcbMpesa ||
-            type == AccountType.investment,
-      );
+      (registeredSavings ||
+          [source, destination].any(
+            (type) =>
+                type == AccountType.mshwariSavings ||
+                type == AccountType.kcbMpesa ||
+                type == AccountType.investment,
+          ));
 }
 
 /// Presentation/accounting policy; does not change parser or classifier output.
@@ -129,6 +132,26 @@ class FinancialSemantics {
   static SubtypeSemantics forSubtype(
     RecordSubtype subtype,
   ) => switch (subtype) {
+    RecordSubtype.registeredSavingsDeposit => const SubtypeSemantics(
+      MovementClass.internalTransfer,
+      FinancialRecordType.transfer,
+      source: AccountType.mpesa,
+      destination: AccountType.unknown,
+      registeredSavings: true,
+    ),
+    RecordSubtype.registeredSavingsWithdrawal => const SubtypeSemantics(
+      MovementClass.internalTransfer,
+      FinancialRecordType.transfer,
+      source: AccountType.unknown,
+      destination: AccountType.mpesa,
+      registeredSavings: true,
+    ),
+    RecordSubtype.instrumentPayment || RecordSubtype.instrumentReceipt =>
+      const SubtypeSemantics(MovementClass.unresolved, null),
+    RecordSubtype.payBillReversal => const SubtypeSemantics(
+      MovementClass.expense,
+      FinancialRecordType.reversal,
+    ),
     RecordSubtype.receiveMoney || RecordSubtype.deposit =>
       const SubtypeSemantics(MovementClass.income, FinancialRecordType.income),
     RecordSubtype.sendMoney ||
@@ -216,13 +239,32 @@ class FinancialSemantics {
         ? null
         : AccountEndpoint(
             type,
-            identity: type == AccountType.investment ? identity : null,
+            identity:
+                type == AccountType.investment ||
+                    (policy.registeredSavings && type == AccountType.unknown)
+                ? identity
+                : null,
           );
     return AccountMovement(
       source: endpoint(policy.source),
       destination: endpoint(policy.destination),
     );
   }
+
+  /// Positive persisted magnitudes; reversals contribute negative expense principal.
+  static bool isExpenseReversal(FinancialRecord record) =>
+      record.type == FinancialRecordType.reversal &&
+      record.subtype == RecordSubtype.payBillReversal;
+  static double principalContribution(FinancialRecord record) =>
+      isExpenseReversal(record) ? -record.amount : record.amount;
+  static String principalSql(String alias) =>
+      "CASE WHEN $alias.type = 'reversal' AND $alias.subtype = 'payBillReversal' THEN -$alias.amount ELSE $alias.amount END";
+  static String categoryRecordSql(String alias) =>
+      "CASE WHEN $alias.type = 'reversal' AND $alias.subtype = 'payBillReversal' THEN $alias.reverses_record_id ELSE $alias.id END";
+  static String effectiveTypeSql(String alias) =>
+      'COALESCE($alias.interpreted_type, $alias.type)';
+  static String effectiveSubtypeSql(String alias) =>
+      'COALESCE($alias.interpreted_subtype, $alias.subtype)';
 
   FinancialTotals calculate(
     Iterable<FinancialRecord> records, {
@@ -244,8 +286,8 @@ class FinancialSemantics {
           income += record.amount;
           received += record.amount;
         case MovementClass.expense:
-          expenses += record.amount;
-          sent += record.amount;
+          expenses += principalContribution(record);
+          sent += principalContribution(record);
         case MovementClass.loanBorrowing:
           borrowed += record.amount;
         case MovementClass.loanRepayment:

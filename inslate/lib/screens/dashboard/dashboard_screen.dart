@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'financial_breakdown_screen.dart';
+import 'dashboard_budget_section.dart';
+import '../../widgets/unspecified_movements_card.dart';
+import '../insights/insights_screen.dart';
 import '../activity/activity_screen.dart';
+import '../activity/transaction_detail_screen.dart';
 import '../../models/activity_filter.dart';
 import '../../models/financial_breakdown.dart';
 import '../../services/financial_breakdown_service.dart';
@@ -18,7 +22,8 @@ import '../../models/financial_records.dart';
 import 'widgets/month_selector.dart';
 
 class DashboardScreen extends ConsumerWidget {
-  const DashboardScreen({super.key});
+  final void Function(FinancialPeriod)? onOpenInsights;
+  const DashboardScreen({super.key, this.onOpenInsights});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -36,6 +41,18 @@ class DashboardScreen extends ConsumerWidget {
               pinned: true,
               delegate: _DashboardStickyHeaderDelegate(
                 height: _DashboardHeader.stickyExtent(context),
+                onOpenInsights: () {
+                  if (onOpenInsights != null) {
+                    onOpenInsights!(period);
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute<void>(
+                        builder: (_) => InsightsScreen(initialPeriod: period),
+                      ),
+                    );
+                  }
+                },
               ),
             ),
             summary.when(
@@ -119,18 +136,10 @@ class _DashboardContent extends StatelessWidget {
           const SizedBox(height: 16),
           _OverviewCard(summary: summary),
           const SizedBox(height: 16),
-          _CategorySummaryCard(
-            summary: summary,
-            kind: BreakdownKind.spending,
-            title: 'Expense categories',
-            icon: Icons.pie_chart_outline_rounded,
-          ),
+          UnspecifiedMovementsCard(period: summary.period),
           const SizedBox(height: 16),
-          _CategorySummaryCard(
-            summary: summary,
-            kind: BreakdownKind.incomeCategories,
-            title: 'Income categories',
-            icon: Icons.south_west_rounded,
+          _PeriodDataVisibility(
+            child: DashboardBudgetSection(period: summary.period),
           ),
           const SizedBox(height: 16),
           _TopPartyCard(
@@ -215,7 +224,11 @@ class _DashboardContent extends StatelessWidget {
 
 class _DashboardStickyHeaderDelegate extends SliverPersistentHeaderDelegate {
   final double height;
-  _DashboardStickyHeaderDelegate({required this.height});
+  final VoidCallback onOpenInsights;
+  _DashboardStickyHeaderDelegate({
+    required this.height,
+    required this.onOpenInsights,
+  });
 
   @override
   double get minExtent => height;
@@ -233,9 +246,9 @@ class _DashboardStickyHeaderDelegate extends SliverPersistentHeaderDelegate {
       color: const Color(0xFFF4F7F8),
       child: Column(
         children: [
-          const _DashboardHeader(),
+          _DashboardHeader(onOpenInsights: onOpenInsights),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
             child: const MonthSelector(),
           ),
         ],
@@ -245,12 +258,14 @@ class _DashboardStickyHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(covariant _DashboardStickyHeaderDelegate oldDelegate) {
-    return oldDelegate.height != height;
+    return oldDelegate.height != height ||
+        oldDelegate.onOpenInsights != onOpenInsights;
   }
 }
 
 class _DashboardHeader extends StatelessWidget {
-  const _DashboardHeader();
+  final VoidCallback onOpenInsights;
+  const _DashboardHeader({required this.onOpenInsights});
 
   // Keep the top section compact, allowing its header text to wrap without
   // clipping at narrow widths or larger accessibility text sizes.
@@ -280,7 +295,7 @@ class _DashboardHeader extends StatelessWidget {
       theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
     );
     final extraHeight = titleHeight + 2 + subtitleHeight - 48;
-    return 200 +
+    return 192 +
         MediaQuery.paddingOf(context).top +
         (extraHeight > 0 ? extraHeight : 0);
   }
@@ -349,8 +364,9 @@ class _DashboardHeader extends StatelessWidget {
             ),
           ),
           IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.insights, color: Colors.white),
+            key: const ValueKey('dashboard.insights'),
+            onPressed: onOpenInsights,
+            icon: const Icon(Icons.insights, color: Colors.lightBlue, size: 28),
           ),
         ],
       ),
@@ -379,22 +395,33 @@ class _MoneyMovementCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: _MovementMetric(
-                  label: 'Received',
-                  amount: summary.totals.received,
-                  icon: Icons.arrow_downward_rounded,
-                  iconColor: const Color(0xFF0F9D8A),
-                  amountColor: Colors.green.shade600,
+                child: InkWell(
+                  onTap: () => _openBreakdown(
+                    context,
+                    summary,
+                    BreakdownKind.incomeCategories,
+                  ),
+                  child: _MovementMetric(
+                    label: 'Received',
+                    amount: summary.totals.received,
+                    icon: Icons.arrow_downward_rounded,
+                    iconColor: const Color(0xFF0F9D8A),
+                    amountColor: Colors.green.shade600,
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _MovementMetric(
-                  label: 'Sent',
-                  amount: summary.totals.sent,
-                  icon: Icons.arrow_upward_rounded,
-                  iconColor: const Color(0xFFD95C5C),
-                  amountColor: Colors.red.shade600,
+                child: InkWell(
+                  onTap: () =>
+                      _openBreakdown(context, summary, BreakdownKind.spending),
+                  child: _MovementMetric(
+                    label: 'Sent',
+                    amount: summary.totals.sent,
+                    icon: Icons.arrow_upward_rounded,
+                    iconColor: const Color(0xFFD95C5C),
+                    amountColor: Colors.red.shade600,
+                  ),
                 ),
               ),
             ],
@@ -440,17 +467,6 @@ class _MoneyMovementCard extends StatelessWidget {
                           style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w700,
                             color: const Color(0xFF0B1F3A),
-                          ),
-                        ),
-                      ),
-                      Flexible(
-                        child: Text(
-                          _money(summary.totals.internalTransfers, context),
-                          textAlign: TextAlign.end,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 15,
-                            color: const Color.fromARGB(255, 69, 70, 71),
                           ),
                         ),
                       ),
@@ -617,18 +633,11 @@ class _OverviewCard extends StatelessWidget {
           const SizedBox(height: 18),
 
           _OverviewRow(
-            label: 'Income',
-            amount: summary.totals.income,
-            icon: Icons.add_circle_outline_rounded,
-            color: const Color(0xFF0F9D8A),
-            amountColor: const Color(0xFF0F9D8A),
-          ),
-          _OverviewRow(
-            label: 'Expenses',
-            amount: summary.totals.expenses,
-            icon: Icons.remove_circle_outline_rounded,
-            color: const Color(0xFFD95C5C),
-            amountColor: const Color(0xFFD95C5C),
+            label: 'Net cash flow',
+            amount: summary.totals.netCashFlow,
+            icon: Icons.account_balance_outlined,
+            color: const Color(0xFF0B1F3A),
+            amountColor: const Color.fromARGB(255, 69, 70, 71),
           ),
           _OverviewRow(
             label: 'Fees',
@@ -636,15 +645,23 @@ class _OverviewCard extends StatelessWidget {
             icon: Icons.receipt_long_outlined,
             color: const Color(0xFF687486),
             amountColor: const Color.fromARGB(255, 69, 70, 71),
-          ),
-          _OverviewRow(
-            label: 'Net cash flow',
-            amount: summary.totals.netCashFlow,
-            icon: Icons.account_balance_outlined,
-            color: const Color(0xFF0B1F3A),
-            amountColor: const Color.fromARGB(255, 69, 70, 71),
             isLast: true,
           ),
+          const SizedBox(height: 16),
+          _CategorySummarySection(
+            summary: summary,
+            kind: BreakdownKind.spending,
+            title: 'Expense categories',
+            icon: Icons.remove_circle_outline_rounded,
+          ),
+          const SizedBox(height: 16),
+          _CategorySummarySection(
+            summary: summary,
+            kind: BreakdownKind.incomeCategories,
+            title: 'Income categories',
+            icon: Icons.add_circle_outline_rounded,
+          ),
+          const SizedBox(height: 16),
         ],
       ),
     );
@@ -682,23 +699,35 @@ class _OverviewRow extends StatelessWidget {
       child: Row(
         children: [
           Icon(icon, size: 19, color: color),
-          const SizedBox(width: 10),
+          const SizedBox(width: 9),
           Expanded(
-            child: Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: Colors.grey.shade700,
-                fontWeight: FontWeight.w600,
+            flex: 3,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                label,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontSize: (theme.textTheme.bodyMedium?.fontSize ?? 14) + 2,
+                  color: Colors.grey.shade700,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
-          Flexible(
-            child: Text(
-              _money(amount, context),
-              textAlign: TextAlign.end,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: amountColor,
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 2,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Text(
+                _money(amount, context),
+                textAlign: TextAlign.end,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: amountColor,
+                ),
               ),
             ),
           ),
@@ -886,7 +915,10 @@ class _PartyRow extends StatelessWidget {
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => ActivityScreen(initialFilter: summary.filter),
+          builder: (_) => ActivityScreen(
+            preserveDrillDown: true,
+            initialFilter: summary.filter,
+          ),
         ),
       ),
       child: Padding(
@@ -1097,6 +1129,8 @@ class _AccountActivityCard extends StatelessWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (pair.first.$1 == BreakdownKind.savingsDeposits)
+                        const Divider(height: 20),
                       Text(
                         pair.first.$1 == BreakdownKind.investmentPurchases
                             ? 'Investments'
@@ -1111,7 +1145,7 @@ class _AccountActivityCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           for (var index = 0; index < pair.length; index++) ...[
-                            if (index > 0) const SizedBox(width: 16),
+                            if (index > 0) const SizedBox(width: 8),
                             Expanded(
                               child: _CapitalMovementRow(
                                 summary: summary,
@@ -1244,65 +1278,88 @@ class _CapitalMovementRow extends StatelessWidget {
     final movementColor = moneyOut
         ? Colors.red.shade600
         : Colors.green.shade600;
-    return InkWell(
-      key: ValueKey(kind),
-      onTap: () => _openBreakdown(context, summary, kind),
-      borderRadius: BorderRadius.circular(10),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      child: ListTile(
+        key: ValueKey(kind),
+        onTap: () => _openBreakdown(context, summary, kind),
+        dense: true,
+        visualDensity: const VisualDensity(vertical: -2),
+        minVerticalPadding: 4,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: Row(
           children: [
-            Row(
-              children: [
-                Icon(icon, size: 20, color: movementColor),
-                const Spacer(),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  size: 18,
-                  color: Colors.grey,
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            Text(
-              _DashboardPendingValues.of(context)
-                  ? '— transactions'
-                  : '${breakdown.count} transactions',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: Colors.grey.shade500),
-            ),
-            const SizedBox(height: 8),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                _money(breakdown.amount, context),
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: movementColor,
+            Icon(icon, size: 18, color: movementColor),
+            const SizedBox(width: 6),
+            Expanded(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
           ],
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    _money(breakdown.amount, context),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: movementColor,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      _DashboardPendingValues.of(context)
+                          ? '\u2014 transactions'
+                          : '${breakdown.count} transactions',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _CategorySummaryCard extends StatelessWidget {
+class _CategorySummarySection extends StatelessWidget {
   final DashboardSummary summary;
   final BreakdownKind kind;
   final String title;
   final IconData icon;
-  const _CategorySummaryCard({
+  const _CategorySummarySection({
     required this.summary,
     required this.kind,
     required this.title,
@@ -1312,48 +1369,90 @@ class _CategorySummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final breakdown = summary.breakdown(kind);
     final expense = kind == BreakdownKind.spending;
-    return _DashboardCard(
-      child: InkWell(
-        onTap: () => _openBreakdown(context, summary, kind),
-        borderRadius: BorderRadius.circular(12),
-        child: _CardContents(
-          children: [
-            _CardHeaderSurface(
-              child: Row(
-                children: [
-                  Icon(icon, size: 20, color: AppTheme.darkBlue),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.darkBlue,
-                      ),
+    return InkWell(
+      onTap: () => _openBreakdown(context, summary, kind),
+      borderRadius: BorderRadius.circular(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                icon,
+                size: 19,
+                color: expense
+                    ? const Color(0xFFD95C5C)
+                    : const Color(0xFF0F9D8A),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                flex: 3,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontSize:
+                          (Theme.of(context).textTheme.bodyMedium?.fontSize ??
+                              14) +
+                          2,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade700,
                     ),
                   ),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    size: 20,
-                    color: AppTheme.darkBlue,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    _money(
+                      expense ? summary.totals.expenses : summary.totals.income,
+                      context,
+                    ),
+                    textAlign: TextAlign.end,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: expense
+                          ? const Color(0xFFD95C5C)
+                          : const Color(0xFF0F9D8A),
+                    ),
                   ),
-                ],
+                ),
               ),
+            ],
+          ),
+          Divider(height: 16, thickness: 1, color: Colors.grey.shade100),
+          if (breakdown.count == 0 && !_DashboardPendingValues.of(context))
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text('No activity for this period.'),
             ),
-            const SizedBox(height: 8),
-            if (breakdown.count == 0 && !_DashboardPendingValues.of(context))
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Text('No activity for this period.'),
-              ),
-            for (final group in breakdown.groups.take(4))
-              _PeriodDataVisibility(
+          for (final group in breakdown.groups.take(4))
+            _PeriodDataVisibility(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: FinancialGroupRow(
                   key: ValueKey(group.filter),
                   group: group,
                   compact: true,
-                  showShare: true,
+                  labelStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontSize: 12,
+                    color: Colors.grey.shade700,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  amountStyle: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: expense
+                        ? Colors.red.shade600
+                        : Colors.green.shade600,
+                  ),
+                  showShare: breakdown.amount > 0 && group.amount >= 0,
                   accentColor: expense
                       ? Colors.red.shade600
                       : Colors.green.shade600,
@@ -1370,8 +1469,8 @@ class _CategorySummaryCard extends StatelessWidget {
                   ),
                 ),
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
@@ -1389,17 +1488,38 @@ class _ActivityCard extends StatelessWidget {
         const SizedBox(height: 12),
         if (transactions.isEmpty && !_DashboardPendingValues.of(context))
           const Text('No activity for the current month.'),
-        for (final transaction in transactions)
+        for (var index = 0; index < transactions.length; index++) ...[
+          if (index > 0) const Divider(height: 1, indent: 16, endIndent: 16),
           _PeriodDataVisibility(
-            child: TransactionRow(record: transaction, central: filter.central),
+            child: TransactionRow(
+              record: transactions[index],
+              central: filter.central,
+              fullWidthMetadata: true,
+              nameFontSize: 12,
+              onTap: transactions[index].id == null
+                  ? null
+                  : () => Navigator.push(
+                      context,
+                      MaterialPageRoute<void>(
+                        builder: (_) => TransactionDetailScreen(
+                          recordId: transactions[index].id!,
+                          central: filter.central,
+                        ),
+                      ),
+                    ),
+            ),
           ),
+        ],
         SizedBox(
           width: double.infinity,
           child: OutlinedButton(
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => ActivityScreen(initialFilter: filter),
+                builder: (_) => ActivityScreen(
+                  preserveDrillDown: true,
+                  initialFilter: filter,
+                ),
               ),
             ),
             child: const Text('View all activity'),

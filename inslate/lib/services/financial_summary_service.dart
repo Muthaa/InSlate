@@ -86,15 +86,18 @@ class FinancialSummaryService {
 
           break;
 
+        case FinancialRecordType.reversal:
         case FinancialRecordType.expense:
           expenseTransactionCount++;
 
-          totalExpenses += record.amount + record.transactionCost;
-          totalSent += record.amount;
+          totalExpenses +=
+              FinancialSemantics.principalContribution(record) +
+              record.transactionCost;
+          totalSent += FinancialSemantics.principalContribution(record);
 
           spendingBySubtype[record.subtype] =
               (spendingBySubtype[record.subtype] ?? 0) +
-              record.amount +
+              FinancialSemantics.principalContribution(record) +
               record.transactionCost;
 
           transactionCountBySubtype[record.subtype] =
@@ -285,13 +288,13 @@ class FinancialSummaryService {
     if (existing == null) {
       parties[key] = _PartyAccumulator(
         party: party,
-        amount: record.amount,
+        amount: FinancialSemantics.principalContribution(record),
         transactionCount: 1,
       );
       return;
     }
 
-    existing.amount += record.amount;
+    existing.amount += FinancialSemantics.principalContribution(record);
     existing.transactionCount++;
   }
 

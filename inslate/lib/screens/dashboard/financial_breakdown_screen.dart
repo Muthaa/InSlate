@@ -27,10 +27,12 @@ String breakdownTitle(BreakdownKind kind) => switch (kind) {
 class FinancialBreakdownScreen extends ConsumerWidget {
   final BreakdownKind kind;
   final ActivityFilter filter;
+  final String? sectionLabel;
   const FinancialBreakdownScreen({
     super.key,
     required this.kind,
     required this.filter,
+    this.sectionLabel,
   });
 
   @override
@@ -46,7 +48,11 @@ class FinancialBreakdownScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppTheme.appBackground,
       appBar: AppBar(
-        title: Text(breakdownTitle(kind)),
+        title: Text(
+          sectionLabel == null
+              ? breakdownTitle(kind)
+              : '$sectionLabel breakdown',
+        ),
         backgroundColor: AppTheme.darkBlue,
         foregroundColor: Colors.white,
       ),
@@ -78,7 +84,10 @@ class FinancialBreakdownScreen extends ConsumerWidget {
                     context,
                     MaterialPageRoute(
                       builder: (_) => parties
-                          ? ActivityScreen(initialFilter: group.filter)
+                          ? ActivityScreen(
+                              preserveDrillDown: true,
+                              initialFilter: group.filter,
+                            )
                           : FinancialBreakdownScreen(
                               kind: kind == BreakdownKind.spending
                                   ? BreakdownKind.expenseParties
@@ -89,12 +98,60 @@ class FinancialBreakdownScreen extends ConsumerWidget {
                   ),
                 )
               : _AccountMovementContent(
-                  breakdown: breakdown,
+                  breakdown: sectionLabel == null
+                      ? breakdown
+                      : FinancialBreakdown(
+                          kind: breakdown.kind,
+                          filter: breakdown.filter,
+                          sections:
+                              sectionLabel == 'Investments' ||
+                                  sectionLabel == 'Savings'
+                              ? [
+                                  BreakdownSection(
+                                    sectionLabel == 'Investments'
+                                        ? 'Purchases'
+                                        : 'Deposits',
+                                    breakdown.sections
+                                        .where(
+                                          (section) =>
+                                              section.label == sectionLabel,
+                                        )
+                                        .expand((section) => section.groups)
+                                        .where(
+                                          (group) =>
+                                              group.filter.direction ==
+                                              TransferDirection.fromCentral,
+                                        ),
+                                  ),
+                                  BreakdownSection(
+                                    sectionLabel == 'Investments'
+                                        ? 'Redemptions'
+                                        : 'Withdrawals',
+                                    breakdown.sections
+                                        .where(
+                                          (section) =>
+                                              section.label == sectionLabel,
+                                        )
+                                        .expand((section) => section.groups)
+                                        .where(
+                                          (group) =>
+                                              group.filter.direction ==
+                                              TransferDirection.intoCentral,
+                                        ),
+                                  ),
+                                ]
+                              : breakdown.sections.where(
+                                  (section) => section.label == sectionLabel,
+                                ),
+                        ),
+                  allowSectionNavigation: sectionLabel == null,
                   onSelect: (group) => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          ActivityScreen(initialFilter: group.filter),
+                      builder: (_) => ActivityScreen(
+                        preserveDrillDown: true,
+                        initialFilter: group.filter,
+                      ),
                     ),
                   ),
                 ),
@@ -107,9 +164,11 @@ class FinancialBreakdownScreen extends ConsumerWidget {
 class _AccountMovementContent extends StatelessWidget {
   final FinancialBreakdown breakdown;
   final ValueChanged<FinancialGroup> onSelect;
+  final bool allowSectionNavigation;
   const _AccountMovementContent({
     required this.breakdown,
     required this.onSelect,
+    this.allowSectionNavigation = true,
   });
 
   @override
@@ -117,6 +176,13 @@ class _AccountMovementContent extends StatelessWidget {
     final theme = Theme.of(context);
     final internal = breakdown.kind == BreakdownKind.internalMovement;
     final loans = breakdown.kind == BreakdownKind.loans;
+    final compactTotals = switch (breakdown.kind) {
+      BreakdownKind.investmentPurchases ||
+      BreakdownKind.investmentRedemptions ||
+      BreakdownKind.savingsDeposits ||
+      BreakdownKind.savingsWithdrawals => true,
+      _ => false,
+    };
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
       children: [
@@ -153,7 +219,10 @@ class _AccountMovementContent extends StatelessWidget {
                       internal
                           ? 'Total internal movement'
                           : loans
-                          ? 'Total loan activity'
+                          ? 'Loan activity'
+                          : breakdown.kind ==
+                                BreakdownKind.investmentsAndSavings
+                          ? 'Savings & investment activity'
                           : 'Total contributions & withdrawals',
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
@@ -163,17 +232,21 @@ class _AccountMovementContent extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  formatMoney(breakdown.amount),
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    color: AppTheme.darkBlue,
-                    fontWeight: FontWeight.w800,
+              if (!loans &&
+                  breakdown.kind != BreakdownKind.investmentsAndSavings) ...[
+                const SizedBox(height: 14),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    formatMoney(breakdown.amount),
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontSize: compactTotals ? 20 : null,
+                      color: AppTheme.darkBlue,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
-              ),
+              ],
               const SizedBox(height: 8),
               Text(
                 '${breakdown.count} transactions',
@@ -230,6 +303,24 @@ class _AccountMovementContent extends StatelessWidget {
             section: section,
             onSelect: onSelect,
             highlightMovement: !internal && !loans,
+            showTotal: breakdown.kind != BreakdownKind.investmentsAndSavings,
+            totalFontSize: compactTotals ? 18 : null,
+            onOpen:
+                allowSectionNavigation &&
+                    breakdown.kind == BreakdownKind.investmentsAndSavings &&
+                    (section.label == 'Savings' ||
+                        section.label == 'Investments')
+                ? () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => FinancialBreakdownScreen(
+                        kind: breakdown.kind,
+                        filter: breakdown.filter,
+                        sectionLabel: section.label,
+                      ),
+                    ),
+                  )
+                : null,
           ),
       ],
     );
@@ -256,10 +347,16 @@ class _AccountMovementSection extends StatelessWidget {
   final BreakdownSection section;
   final ValueChanged<FinancialGroup> onSelect;
   final bool highlightMovement;
+  final bool showTotal;
+  final double? totalFontSize;
+  final VoidCallback? onOpen;
   const _AccountMovementSection({
     required this.section,
     required this.onSelect,
     this.highlightMovement = false,
+    this.showTotal = true,
+    this.totalFontSize,
+    this.onOpen,
   });
 
   @override
@@ -287,47 +384,67 @@ class _AccountMovementSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(9),
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    switch (direction) {
-                      TransferDirection.intoCentral => Icons.south_west_rounded,
-                      TransferDirection.fromCentral => Icons.north_east_rounded,
-                      _ => Icons.swap_horiz_rounded,
-                    },
-                    color: accent,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    section.label,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.darkBlue,
+            InkWell(
+              onTap: onOpen,
+              borderRadius: BorderRadius.circular(12),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(9),
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      switch (direction) {
+                        TransferDirection.intoCentral =>
+                          Icons.south_west_rounded,
+                        TransferDirection.fromCentral =>
+                          Icons.north_east_rounded,
+                        _ => Icons.swap_horiz_rounded,
+                      },
+                      color: accent,
+                      size: 20,
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                formatMoney(section.amount),
-                style: theme.textTheme.titleLarge?.copyWith(
-                  color: accent,
-                  fontWeight: FontWeight.w800,
-                ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      section.label,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.darkBlue,
+                      ),
+                    ),
+                  ),
+                  if (onOpen != null)
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      size: 20,
+                      color: AppTheme.darkBlue,
+                    ),
+                ],
               ),
             ),
+            if (showTotal) ...[
+              const SizedBox(height: 12),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  formatMoney(section.amount),
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontSize:
+                        totalFontSize ??
+                        (section.label == 'Borrowed' ||
+                                section.label == 'Repaid'
+                            ? 19
+                            : null),
+                    color: accent,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 4),
             Text(
               '${section.count} transactions${section.includedInTotal ? '' : ' · Excluded from total'}',
@@ -378,6 +495,14 @@ class _AccountMovementSection extends StatelessWidget {
                 FinancialGroupRow(
                   group: group,
                   compact: true,
+                  amountStyle:
+                      section.label == 'Borrowed' || section.label == 'Repaid'
+                      ? TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: _directionColor(_groupDirection(group)),
+                        )
+                      : null,
                   accentColor: _directionColor(_groupDirection(group)),
                   onTap: () => onSelect(group),
                 ),
@@ -422,6 +547,15 @@ class _FinancialGroupingContent extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                   color: AppTheme.darkBlue,
                 ),
+              ),
+            ),
+            IconButton(
+              tooltip: expense ? 'About expenses' : 'About income',
+              icon: const Icon(Icons.info_outline, color: AppTheme.darkBlue),
+              onPressed: () => showDialog<void>(
+                context: context,
+                builder: (context) =>
+                    _BreakdownInformationDialog(expense: expense),
               ),
             ),
           ],
@@ -492,7 +626,9 @@ class _FinancialGroupingContent extends StatelessWidget {
                   fit: BoxFit.scaleDown,
                   child: Text(
                     formatMoney(breakdown.amount),
-                    style: theme.textTheme.headlineMedium?.copyWith(
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontSize:
+                          (theme.textTheme.titleLarge?.fontSize ?? 20) - 2,
                       fontWeight: FontWeight.w800,
                       color: accent,
                       letterSpacing: -0.5,
@@ -637,7 +773,8 @@ class _FinancialGroupingContent extends StatelessWidget {
                   Expanded(
                     child: FinancialGroupRow(
                       group: group,
-                      showShare: !parties,
+                      showShare:
+                          !parties && breakdown.amount > 0 && group.amount >= 0,
                       compact: true,
                       accentColor: accent,
                       onTap: () => onSelect(group),
@@ -648,6 +785,130 @@ class _FinancialGroupingContent extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _BreakdownInformationDialog extends StatelessWidget {
+  final bool expense;
+  const _BreakdownInformationDialog({required this.expense});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final accent = expense ? Colors.red.shade700 : Colors.green.shade700;
+    final details = expense
+        ? [
+            (
+              'What is included',
+              'Ordinary expense principal, reduced by approved PayBill reversals on their reversal dates.',
+            ),
+            (
+              'Fees stay separate',
+              'Fees are excluded from expense totals and deducted once in net cash flow.',
+            ),
+          ]
+        : [
+            (
+              'What is included',
+              'Ordinary incoming funds for the selected period. Fees are shown separately.',
+            ),
+            (
+              'What is excluded',
+              'Loan principal, internal transfers, savings and investment movements, and returned PayBill principal.',
+            ),
+          ];
+    return AlertDialog(
+      backgroundColor: const Color(0xFFF4F7F8),
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+      contentPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              expense ? Icons.north_east_rounded : Icons.south_west_rounded,
+              color: accent,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              expense ? 'About expenses' : 'About income',
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: AppTheme.darkBlue,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Close',
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.close_rounded, color: AppTheme.darkBlue),
+          ),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final detail in details) ...[
+              Text(
+                detail.$1,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: AppTheme.darkBlue,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                detail.$2,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.grey.shade700,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 18),
+            ],
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.darkBlue.withValues(alpha: 0.04),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.insights_outlined,
+                    size: 18,
+                    color: AppTheme.teal,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Purpose-category totals are available in Insights.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppTheme.darkBlue,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

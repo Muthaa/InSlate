@@ -59,6 +59,7 @@ Future<void> backgroundSmsHandler(SmsMessage sms) async {
       'BACKGROUND SMS IMPORT: '
       '${result.imported} imported, '
       '${result.skipped} skipped, '
+      '${result.duplicate} duplicate, '
       '${result.failed} failed',
     );
   } catch (e) {
