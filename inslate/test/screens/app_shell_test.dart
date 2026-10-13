@@ -60,6 +60,7 @@ void main() {
         await tester.pumpWidget(
           ProviderScope(
             overrides: [
+              databaseProvider.overrideWithValue(database),
               financialRecordsRepositoryProvider.overrideWithValue(repository),
               financialSummaryProvider.overrideWith((ref) async => summary),
               availableMonthsProvider.overrideWith(

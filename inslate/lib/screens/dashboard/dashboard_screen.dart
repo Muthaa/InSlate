@@ -1,87 +1,108 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'financial_breakdown_screen.dart';
-import 'dashboard_budget_section.dart';
-import '../../widgets/unspecified_movements_card.dart';
-import '../insights/insights_screen.dart';
-import '../activity/activity_screen.dart';
-import '../activity/transaction_detail_screen.dart';
+import '../../core/branding/app_brand.dart';
+import '../../core/design/slate_components.dart';
+import '../../core/presentation/financial_presentation.dart';
 import '../../models/activity_filter.dart';
 import '../../models/financial_breakdown.dart';
-import '../../services/financial_breakdown_service.dart';
-import '../../core/presentation/financial_presentation.dart';
-import '../../widgets/financial_group_row.dart';
-import '../../widgets/transaction_row.dart';
+import '../../models/financial_period.dart';
+import '../../models/financial_records.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../providers/financial_summary_provider.dart';
-import '../../models/financial_period.dart';
-
-import '../../core/theme/app_theme.dart';
-import '../../models/financial_records.dart';
-
+import '../../widgets/app_dialog.dart';
+import '../../widgets/financial_group_row.dart';
+import '../../widgets/transaction_row.dart';
+import '../../widgets/unspecified_movements_card.dart';
+import '../activity/activity_screen.dart';
+import '../activity/transaction_detail_screen.dart';
+import '../insights/insights_screen.dart';
+import 'dashboard_budget_section.dart';
+import 'financial_breakdown_screen.dart';
+import 'home_attention.dart';
+import 'home_comparison.dart';
 import 'widgets/month_selector.dart';
 
 class DashboardScreen extends ConsumerWidget {
   final void Function(FinancialPeriod)? onOpenInsights;
   const DashboardScreen({super.key, this.onOpenInsights});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final summary = ref.watch(dashboardSummaryProvider);
     final period = FinancialPeriod.month(ref.watch(selectedMonthProvider));
+    void insights() {
+      if (onOpenInsights != null) {
+        onOpenInsights!(period);
+      } else {
+        Navigator.push(
+          context,
+          MaterialPageRoute<void>(
+            builder: (_) => InsightsScreen(initialPeriod: period),
+          ),
+        );
+      }
+    }
 
     return Scaffold(
-      backgroundColor: AppTheme.appBackground,
+      backgroundColor: SlateColors.of(context).canvas,
       body: SafeArea(
-        top: false,
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: _DashboardStickyHeaderDelegate(
-                height: _DashboardHeader.stickyExtent(context),
-                onOpenInsights: () {
-                  if (onOpenInsights != null) {
-                    onOpenInsights!(period);
-                  } else {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute<void>(
-                        builder: (_) => InsightsScreen(initialPeriod: period),
-                      ),
-                    );
-                  }
-                },
-              ),
-            ),
-            summary.when(
-              skipLoadingOnReload: true,
-              skipLoadingOnRefresh: true,
-              loading: () => const _DashboardPeriodLoading(),
-              error: (error, stack) => SliverFillRemaining(
-                hasScrollBody: false,
-                child: _ErrorState(
-                  onRetry: () => ref.invalidate(periodRecordsProvider(period)),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: SlateSpace.pageWidth),
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: _HomeHeader(onOpenInsights: insights),
                 ),
-              ),
-              data: (summary) {
-                return _DashboardPendingValues(
-                  pending: summary.period != period,
-                  child: SliverIgnorePointer(
-                    ignoring: summary.period != period,
-                    sliver: _DashboardContent(summary: summary),
+                summary.when(
+                  skipLoadingOnReload: true,
+                  skipLoadingOnRefresh: true,
+                  loading: () => const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
+                      child: SlateState(
+                        kind: SlateStateKind.loading,
+                        title: 'Loading this period…',
+                        message: 'Bringing your recorded finances into focus.',
+                      ),
+                    ),
                   ),
-                );
-              },
+                  error: (_, _) => SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
+                      child: SlateState(
+                        kind: SlateStateKind.error,
+                        title: 'Unable to load your financial summary.',
+                        message:
+                            'Your stored records are unchanged. Try loading this period again.',
+                        actionLabel: 'Retry',
+                        onAction: () =>
+                            ref.invalidate(periodRecordsProvider(period)),
+                      ),
+                    ),
+                  ),
+                  data: (data) => _DashboardPendingValues(
+                    pending: data.period != period,
+                    child: SliverIgnorePointer(
+                      ignoring: data.period != period,
+                      sliver: _HomeContent(
+                        summary: data,
+                        onOpenInsights: insights,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
+// Keep the same content tree during refresh; mask all old-period values and
+// disable drill-downs until the selected period has arrived.
 class _DashboardPendingValues extends InheritedWidget {
   final bool pending;
   const _DashboardPendingValues({required this.pending, required super.child});
@@ -108,112 +129,181 @@ class _PeriodDataVisibility extends StatelessWidget {
   );
 }
 
-class _DashboardPeriodLoading extends StatelessWidget {
-  const _DashboardPeriodLoading();
-
-  @override
-  Widget build(BuildContext context) => const SliverFillRemaining(
-    hasScrollBody: false,
-    child: Center(child: Text('Loading this period…')),
-  );
-}
-
-class _DashboardContent extends StatelessWidget {
-  final DashboardSummary summary;
-  const _DashboardContent({required this.summary});
-
+class _HomeHeader extends StatelessWidget {
+  final VoidCallback onOpenInsights;
+  const _HomeHeader({required this.onOpenInsights});
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final showRecent =
-        summary.period.start.year == now.year &&
-        summary.period.start.month == now.month;
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.asset(
+                  'lib/assets/images/inslate_logo.png',
+                  width: 44,
+                  height: 44,
+                  fit: BoxFit.contain,
+                  semanticLabel: 'InSlate blue and yellow logo',
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(AppBrand.name, style: theme.textTheme.titleLarge),
+                    Text(AppBrand.tagline, style: theme.textTheme.bodySmall),
+                  ],
+                ),
+              ),
+              IconButton(
+                key: const ValueKey('dashboard.insights'),
+                tooltip: 'Open Insights for selected month',
+                onPressed: onOpenInsights,
+                icon: const Icon(Icons.insights_outlined),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Your financial overview',
+            style: theme.textTheme.headlineMedium,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'A clearer picture of your recorded money.',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          const MonthSelector(),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeContent extends StatelessWidget {
+  final DashboardSummary summary;
+  final VoidCallback onOpenInsights;
+  const _HomeContent({required this.summary, required this.onOpenInsights});
+  @override
+  Widget build(BuildContext context) {
+    final empty = summary.recent.isEmpty;
     return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
       sliver: SliverList(
         delegate: SliverChildListDelegate([
-          _MoneyMovementCard(summary: summary),
-          const SizedBox(height: 16),
-          _OverviewCard(summary: summary),
-          const SizedBox(height: 16),
-          UnspecifiedMovementsCard(period: summary.period),
-          const SizedBox(height: 16),
-          _PeriodDataVisibility(
-            child: DashboardBudgetSection(period: summary.period),
-          ),
-          const SizedBox(height: 16),
-          _TopPartyCard(
-            title: 'Top expenses',
-            subtitle: 'People and businesses you sent the most to',
-            parties: summary
-                .breakdown(BreakdownKind.expenseParties)
-                .groups
-                .take(5)
-                .toList(),
-            isExpense: true,
-            partyCount: summary
-                .breakdown(BreakdownKind.expenseParties)
-                .groups
-                .where((group) => group.filter.party != null)
-                .length,
-            transactionCount: summary
-                .breakdown(BreakdownKind.expenseParties)
-                .count,
-            averageTransaction:
-                summary.breakdown(BreakdownKind.expenseParties).count == 0
-                ? 0
-                : summary.breakdown(BreakdownKind.expenseParties).amount /
-                      summary.breakdown(BreakdownKind.expenseParties).count,
-            onOpen: () =>
-                _openBreakdown(context, summary, BreakdownKind.expenseParties),
-          ),
-          const SizedBox(height: 16),
-          _TopPartyCard(
-            title: 'Top income',
-            subtitle: 'People and businesses you received the most from',
-            parties: summary
-                .breakdown(BreakdownKind.incomeParties)
-                .groups
-                .take(5)
-                .toList(),
-            isExpense: false,
-            partyCount: summary
-                .breakdown(BreakdownKind.incomeParties)
-                .groups
-                .where((group) => group.filter.party != null)
-                .length,
-            transactionCount: summary
-                .breakdown(BreakdownKind.incomeParties)
-                .count,
-            averageTransaction:
-                summary.breakdown(BreakdownKind.incomeParties).count == 0
-                ? 0
-                : summary.breakdown(BreakdownKind.incomeParties).amount /
-                      summary.breakdown(BreakdownKind.incomeParties).count,
-            onOpen: () =>
-                _openBreakdown(context, summary, BreakdownKind.incomeParties),
-          ),
-          const SizedBox(height: 16),
-          _AccountActivityCard(
-            summary: summary,
-            kind: BreakdownKind.loans,
-            title: 'Loans',
-            icon: Icons.account_balance_rounded,
-            action: 'View loan breakdown',
-          ),
-          const SizedBox(height: 16),
-          _AccountActivityCard(
-            summary: summary,
-            kind: BreakdownKind.investmentsAndSavings,
-            title: 'Investments & Savings',
-            icon: Icons.savings_outlined,
-            action: 'View savings & investments',
-          ),
-          if (showRecent) ...[
+          if (empty) ...[
+            SlateCard(
+              child: SlateState(
+                kind: _DashboardPendingValues.of(context)
+                    ? SlateStateKind.loading
+                    : SlateStateKind.empty,
+                title: _DashboardPendingValues.of(context)
+                    ? 'Loading this period…'
+                    : 'Your story starts with a record',
+                message: _DashboardPendingValues.of(context)
+                    ? 'Bringing your recorded finances into focus.'
+                    : 'No financial records for this month. Choose a month with activity to see your income, spending and money movements.',
+              ),
+            ),
+            const SizedBox(height: 24),
+            const HomeAttention(),
+            const SizedBox(height: 24),
+            _PeriodDataVisibility(
+              child: DashboardBudgetSection(period: summary.period),
+            ),
+          ] else ...[
+            _OverviewCard(summary: summary),
+            const SizedBox(height: 24),
+            const HomeAttention(),
+            const SizedBox(height: 24),
+            _PeriodDataVisibility(
+              child: HomeComparison(period: summary.period),
+            ),
+            const SizedBox(height: 32),
+            const SlateSectionHeading(
+              title: 'Beyond income & spending',
+              subtitle:
+                  'Contributions, withdrawals and principal · separate from cash flow',
+            ),
             const SizedBox(height: 16),
+            _CapitalCard(
+              summary: summary,
+              title: 'Investments',
+              icon: Icons.trending_up_rounded,
+              items: const [
+                (BreakdownKind.investmentPurchases, 'Purchases'),
+                (BreakdownKind.investmentRedemptions, 'Redemptions'),
+              ],
+              detail:
+                  'Money invested and redeemed. These are movements, not returns or holdings.',
+            ),
+            const SizedBox(height: 12),
+            _CapitalCard(
+              summary: summary,
+              title: 'Savings',
+              icon: Icons.savings_outlined,
+              items: const [
+                (BreakdownKind.savingsDeposits, 'Deposits'),
+                (BreakdownKind.savingsWithdrawals, 'Withdrawals'),
+              ],
+              detail:
+                  'Deposits and withdrawals. Savings balances are not inferred.',
+            ),
+            const SizedBox(height: 12),
+            _LoanCard(summary: summary),
+            const SizedBox(height: 12),
+            _MoneyMovementCard(summary: summary),
+            const SizedBox(height: 12),
+            _PeriodDataVisibility(
+              child: UnspecifiedMovementsCard(period: summary.period),
+            ),
+            const SizedBox(height: 32),
             _ActivityCard(
               transactions: summary.recent,
               filter: ActivityFilter(period: summary.period),
+            ),
+            const SizedBox(height: 32),
+            _PeriodDataVisibility(
+              child: DashboardBudgetSection(period: summary.period),
+            ),
+            const SizedBox(height: 32),
+            const SlateSectionHeading(
+              title: 'Follow the money',
+              subtitle:
+                  'Explore the transaction types and people behind the totals',
+            ),
+            const SizedBox(height: 16),
+            _CategoriesCard(
+              summary: summary,
+              kind: BreakdownKind.spending,
+              title: 'Expense categories',
+              action: 'Expense transaction types',
+            ),
+            const SizedBox(height: 12),
+            _CategoriesCard(
+              summary: summary,
+              kind: BreakdownKind.incomeCategories,
+              title: 'Income categories',
+              action: 'Income transaction types',
+            ),
+            const SizedBox(height: 12),
+            _PartiesCard(summary: summary, expense: true),
+            const SizedBox(height: 12),
+            _PartiesCard(summary: summary, expense: false),
+            const SizedBox(height: 32),
+            const SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: onOpenInsights,
+              icon: const Icon(Icons.insights_outlined),
+              label: const Text('Explore more in Insights'),
             ),
           ],
         ]),
@@ -222,1254 +312,527 @@ class _DashboardContent extends StatelessWidget {
   }
 }
 
-class _DashboardStickyHeaderDelegate extends SliverPersistentHeaderDelegate {
-  final double height;
-  final VoidCallback onOpenInsights;
-  _DashboardStickyHeaderDelegate({
-    required this.height,
-    required this.onOpenInsights,
-  });
-
-  @override
-  double get minExtent => height;
-
-  @override
-  double get maxExtent => height;
-
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) {
-    return Container(
-      color: const Color(0xFFF4F7F8),
-      child: Column(
-        children: [
-          _DashboardHeader(onOpenInsights: onOpenInsights),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-            child: const MonthSelector(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  bool shouldRebuild(covariant _DashboardStickyHeaderDelegate oldDelegate) {
-    return oldDelegate.height != height ||
-        oldDelegate.onOpenInsights != onOpenInsights;
-  }
-}
-
-class _DashboardHeader extends StatelessWidget {
-  final VoidCallback onOpenInsights;
-  const _DashboardHeader({required this.onOpenInsights});
-
-  // Keep the top section compact, allowing its header text to wrap without
-  // clipping at narrow widths or larger accessibility text sizes.
-  static double stickyExtent(BuildContext context) {
-    final theme = Theme.of(context);
-    final textWidth = MediaQuery.sizeOf(context).width - 36 - 48 - 12 - 48;
-    double textHeight(String text, TextStyle? style) {
-      final painter = TextPainter(
-        text: TextSpan(text: text, style: style),
-        textDirection: Directionality.of(context),
-        textScaler: MediaQuery.textScalerOf(context),
-      )..layout(maxWidth: textWidth > 0 ? textWidth : 1);
-      final height = painter.height;
-      painter.dispose();
-      return height;
-    }
-
-    final titleHeight = textHeight(
-      'InSlate',
-      theme.textTheme.titleLarge?.copyWith(
-        fontWeight: FontWeight.w800,
-        letterSpacing: -0.4,
-      ),
-    );
-    final subtitleHeight = textHeight(
-      'Financial intelligence',
-      theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
-    );
-    final extraHeight = titleHeight + 2 + subtitleHeight - 48;
-    return 192 +
-        MediaQuery.paddingOf(context).top +
-        (extraHeight > 0 ? extraHeight : 0);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.only(
-        top: MediaQuery.paddingOf(context).top + 14,
-        left: 20,
-        right: 16,
-        bottom: 18,
-      ),
-      decoration: const BoxDecoration(color: Color(0xFF0B1F3A)),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: Image.asset(
-                'lib/assets/images/inslate_logo.png',
-                width: 48,
-                height: 48,
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'InSlate',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.4,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Financial intelligence',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.68),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            key: const ValueKey('dashboard.insights'),
-            onPressed: onOpenInsights,
-            icon: const Icon(Icons.insights, color: Colors.lightBlue, size: 28),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MoneyMovementCard extends StatelessWidget {
-  final DashboardSummary summary;
-
-  const _MoneyMovementCard({required this.summary});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return _DashboardCard(
-      child: _CardContents(
-        children: [
-          const _CardHeader(
-            title: 'Money movement',
-            icon: Icons.swap_vert_rounded,
-          ),
-          const SizedBox(height: 20),
-
-          Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: () => _openBreakdown(
-                    context,
-                    summary,
-                    BreakdownKind.incomeCategories,
-                  ),
-                  child: _MovementMetric(
-                    label: 'Received',
-                    amount: summary.totals.received,
-                    icon: Icons.arrow_downward_rounded,
-                    iconColor: const Color(0xFF0F9D8A),
-                    amountColor: Colors.green.shade600,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: InkWell(
-                  onTap: () =>
-                      _openBreakdown(context, summary, BreakdownKind.spending),
-                  child: _MovementMetric(
-                    label: 'Sent',
-                    amount: summary.totals.sent,
-                    icon: Icons.arrow_upward_rounded,
-                    iconColor: const Color(0xFFD95C5C),
-                    amountColor: Colors.red.shade600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 18),
-
-          InkWell(
-            key: const ValueKey('internal-movement-link'),
-            onTap: () => _openBreakdown(
-              context,
-              summary,
-              BreakdownKind.internalMovement,
-            ),
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF4F7F8),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0B1F3A),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.account_balance_wallet_outlined,
-                          size: 18,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Internal movement',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF0B1F3A),
-                          ),
-                        ),
-                      ),
-                      const Icon(Icons.chevron_right_rounded, size: 18),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _InternalTransferMetric(
-                          label:
-                              'Into ${accountLabel(summary.breakdown(BreakdownKind.internalMovement).filter.central.type)}',
-                          amount: summary.totals.transfersIntoCentral,
-                          icon: Icons.south_west_rounded,
-                          color: const Color(0xFF0F9D8A),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _InternalTransferMetric(
-                          label:
-                              'From ${accountLabel(summary.breakdown(BreakdownKind.internalMovement).filter.central.type)}',
-                          amount: summary.totals.transfersFromCentral,
-                          icon: Icons.north_east_rounded,
-                          color: const Color(0xFFD95C5C),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MovementMetric extends StatelessWidget {
-  final String label;
-  final double amount;
-  final IconData icon;
-  final Color iconColor;
-  final Color amountColor;
-
-  const _MovementMetric({
-    required this.label,
-    required this.amount,
-    required this.icon,
-    required this.iconColor,
-    required this.amountColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(
-            color: iconColor.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, size: 18, color: iconColor),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: Colors.grey.shade600,
-                ),
-              ),
-              const SizedBox(height: 3),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  _money(amount, context),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: amountColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _InternalTransferMetric extends StatelessWidget {
-  final String label;
-  final double amount;
-  final IconData icon;
-  final Color color;
-
-  const _InternalTransferMetric({
-    required this.label,
-    required this.amount,
-    required this.icon,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 17, color: color),
-            const SizedBox(width: 5),
-            Expanded(
-              child: Text(
-                label,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: Colors.grey.shade600,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 5),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            _money(amount, context),
-            style: theme.textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF0B1F3A),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _OverviewCard extends StatelessWidget {
   final DashboardSummary summary;
-
   const _OverviewCard({required this.summary});
-
   @override
   Widget build(BuildContext context) {
-    return _DashboardCard(
-      child: _CardContents(
-        children: [
-          const _CardHeader(title: 'Overview', icon: Icons.insights_rounded),
-          const SizedBox(height: 18),
-
-          _OverviewRow(
-            label: 'Net cash flow',
-            amount: summary.totals.netCashFlow,
-            icon: Icons.account_balance_outlined,
-            color: const Color(0xFF0B1F3A),
-            amountColor: const Color.fromARGB(255, 69, 70, 71),
-          ),
-          _OverviewRow(
-            label: 'Fees',
-            amount: summary.totals.fees,
-            icon: Icons.receipt_long_outlined,
-            color: const Color(0xFF687486),
-            amountColor: const Color.fromARGB(255, 69, 70, 71),
-            isLast: true,
-          ),
-          const SizedBox(height: 16),
-          _CategorySummarySection(
-            summary: summary,
-            kind: BreakdownKind.spending,
-            title: 'Expense categories',
-            icon: Icons.remove_circle_outline_rounded,
-          ),
-          const SizedBox(height: 16),
-          _CategorySummarySection(
-            summary: summary,
-            kind: BreakdownKind.incomeCategories,
-            title: 'Income categories',
-            icon: Icons.add_circle_outline_rounded,
-          ),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-}
-
-class _OverviewRow extends StatelessWidget {
-  final String label;
-  final double amount;
-  final IconData icon;
-  final Color color;
-  final Color amountColor;
-  final bool isLast;
-
-  const _OverviewRow({
-    required this.label,
-    required this.amount,
-    required this.icon,
-    required this.color,
-    this.amountColor = const Color(0xFF0B1F3A),
-    this.isLast = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+    final p = SlateColors.of(context);
     final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 11),
-      decoration: isLast
-          ? null
-          : BoxDecoration(
-              border: Border(bottom: BorderSide(color: Colors.grey.shade100)),
-            ),
-      child: Row(
-        children: [
-          Icon(icon, size: 19, color: color),
-          const SizedBox(width: 9),
-          Expanded(
-            flex: 3,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                label,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontSize: (theme.textTheme.bodyMedium?.fontSize ?? 14) + 2,
-                  color: Colors.grey.shade700,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            flex: 2,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerRight,
-              child: Text(
-                _money(amount, context),
-                textAlign: TextAlign.end,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: amountColor,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-void _openBreakdown(
-  BuildContext context,
-  DashboardSummary summary,
-  BreakdownKind kind,
-) {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => FinancialBreakdownScreen(
-        kind: kind,
-        filter: ActivityFilter(
-          period: summary.period,
-          scope: FinancialBreakdownService.scopeFor(kind),
-        ),
-      ),
-    ),
-  );
-}
-
-class _TopPartyCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final List<FinancialGroup> parties;
-  final bool isExpense;
-  final int partyCount;
-  final int transactionCount;
-  final double averageTransaction;
-  final VoidCallback onOpen;
-
-  const _TopPartyCard({
-    required this.title,
-    required this.subtitle,
-    required this.parties,
-    required this.isExpense,
-    required this.partyCount,
-    required this.transactionCount,
-    required this.averageTransaction,
-    required this.onOpen,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return _DashboardCard(
-      child: InkWell(
-        onTap: onOpen,
-        child: _CardContents(
-          children: [
-            _CardHeader(
-              title: title,
-              icon: isExpense
-                  ? Icons.north_east_rounded
-                  : Icons.south_west_rounded,
-            ),
-            const SizedBox(height: 10),
-            Text(
-              subtitle,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: Colors.grey.shade500,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(
-                  isExpense
-                      ? Icons.storefront_outlined
-                      : Icons.account_circle_outlined,
-                  size: 16,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 5),
-                Text(
-                  _DashboardPendingValues.of(context)
-                      ? (isExpense ? '— merchants' : '— sources')
-                      : (isExpense
-                            ? '$partyCount merchants'
-                            : '$partyCount sources'),
-                  style: theme.textTheme.bodySmall,
-                ),
-                const Spacer(),
-                Flexible(
-                  child: Text(
-                    'Avg. transaction ${_money(averageTransaction, context)}',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            if (parties.isEmpty)
-              const _PeriodDataVisibility(child: _EmptyPartyState())
-            else
-              ...List.generate(
-                parties.length,
-                (index) => Column(
-                  children: [
-                    _PeriodDataVisibility(
-                      child: _PartyRow(
-                        summary: parties[index],
-                        isExpense: isExpense,
-                      ),
-                    ),
-                    if (index < parties.length - 1)
-                      Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: Colors.grey.shade200,
-                        indent: 36,
-                      ),
-                  ],
-                ),
-              ),
-            const SizedBox(height: 4),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.darkTeal,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                onPressed: onOpen,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.arrow_forward_rounded, size: 17),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        _DashboardPendingValues.of(context)
-                            ? (isExpense
-                                  ? 'View all Expenses'
-                                  : 'View all Income')
-                            : isExpense
-                            ? 'View all Expenses ($transactionCount)'
-                            : 'View all Income ($transactionCount)',
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PartyRow extends StatelessWidget {
-  final FinancialGroup summary;
-  final bool isExpense;
-
-  const _PartyRow({required this.summary, required this.isExpense});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final party = summary.label;
-
-    return InkWell(
-      key: ValueKey(summary.filter),
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ActivityScreen(
-            preserveDrillDown: true,
-            initialFilter: summary.filter,
-          ),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: LayoutBuilder(
-          builder: (context, constraints) => Row(
-            children: [
-              _PartyAvatar(party: party),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      party,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontSize: 13,
-                        color: const Color(0xFF0B1F3A),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${summary.count} '
-                      '${summary.count == 1 ? 'transaction' : 'transactions'}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: constraints.maxWidth * 0.4,
-                ),
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    '${isExpense ? '-' : '+'}${_money(summary.amount, context)}',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: isExpense
-                          ? const Color(0xFFD95C5C)
-                          : const Color(0xFF0F9D8A),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PartyAvatar extends StatelessWidget {
-  final String party;
-
-  const _PartyAvatar({required this.party});
-
-  @override
-  Widget build(BuildContext context) {
-    final letter = party.trim().isEmpty ? '?' : party.trim()[0].toUpperCase();
-
-    return Container(
-      width: 38,
-      height: 38,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0F4F5),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        letter,
-        style: const TextStyle(
-          color: Color(0xFF0B1F3A),
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyPartyState extends StatelessWidget {
-  const _EmptyPartyState();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Text(
-        'No identified people or businesses yet.',
-        style: Theme.of(
-          context,
-        ).textTheme.bodySmall?.copyWith(color: Colors.grey.shade500),
-      ),
-    );
-  }
-}
-
-class _AccountActivityCard extends StatelessWidget {
-  final DashboardSummary summary;
-  final BreakdownKind kind;
-  final String title, action;
-  final IconData icon;
-  const _AccountActivityCard({
-    required this.summary,
-    required this.kind,
-    required this.title,
-    required this.action,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final loans = kind == BreakdownKind.loans;
-    final sections = summary
-        .breakdown(kind)
-        .sections
-        .where((section) => section.includedInTotal)
-        .take(2)
-        .toList();
-    void open() => _openBreakdown(context, summary, kind);
-    return Card(
-      color: Colors.white,
-      surfaceTintColor: Colors.transparent,
-      child: InkWell(
-        onTap: null,
-        borderRadius: BorderRadius.circular(22),
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 18),
-          child: _CardContents(
-            children: [
-              _CardHeaderSurface(
-                child: Row(
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: AppTheme.darkBlue.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(icon, color: AppTheme.darkBlue),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.darkBlue,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            loans
-                                ? 'Loan activity this period'
-                                : 'Money moved this period',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: AppTheme.darkBlue.withValues(alpha: 0.65),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              if (!loans)
-                for (final pair in const [
-                  [
-                    (
-                      BreakdownKind.investmentPurchases,
-                      'Purchases',
-                      Icons.trending_up_rounded,
-                    ),
-                    (
-                      BreakdownKind.investmentRedemptions,
-                      'Redemptions',
-                      Icons.south_west_rounded,
-                    ),
-                  ],
-                  [
-                    (
-                      BreakdownKind.savingsDeposits,
-                      'Deposits',
-                      Icons.savings_outlined,
-                    ),
-                    (
-                      BreakdownKind.savingsWithdrawals,
-                      'Withdrawals',
-                      Icons.north_east_rounded,
-                    ),
-                  ],
-                ])
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (pair.first.$1 == BreakdownKind.savingsDeposits)
-                        const Divider(height: 20),
-                      Text(
-                        pair.first.$1 == BreakdownKind.investmentPurchases
-                            ? 'Investments'
-                            : 'Savings',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.darkBlue,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          for (var index = 0; index < pair.length; index++) ...[
-                            if (index > 0) const SizedBox(width: 8),
-                            Expanded(
-                              child: _CapitalMovementRow(
-                                summary: summary,
-                                kind: pair[index].$1,
-                                label: pair[index].$2,
-                                icon: pair[index].$3,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                  ),
-              if (loans)
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (var index = 0; index < sections.length; index++) ...[
-                      if (index > 0) const SizedBox(width: 12),
-                      Expanded(
-                        child: Container(
-                          padding: loans
-                              ? EdgeInsets.zero
-                              : const EdgeInsets.all(12),
-                          decoration: loans
-                              ? null
-                              : BoxDecoration(
-                                  color: AppTheme.darkTeal.withValues(
-                                    alpha: 0.05,
-                                  ),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                sections[index].label,
-                                style: theme.textTheme.bodySmall,
-                              ),
-                              const SizedBox(height: 6),
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Text(
-                                    _money(sections[index].amount, context),
-                                    style: theme.textTheme.titleMedium
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.w700,
-                                          color: loans && index == 0
-                                              ? theme.colorScheme.error
-                                              : AppTheme.darkTeal,
-                                        ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                _DashboardPendingValues.of(context)
-                                    ? '— transactions'
-                                    : '${sections[index].count} transactions',
-                                style: theme.textTheme.bodySmall,
-                              ),
-                              if (!loans) ...[
-                                const SizedBox(height: 6),
-                                Text(
-                                  index == 0
-                                      ? 'Deposits & withdrawals'
-                                      : 'Purchases & redemptions',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: Colors.white70,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: open,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    backgroundColor: AppTheme.darkTeal,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: Text(action, textAlign: TextAlign.center),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _CapitalMovementRow extends StatelessWidget {
-  final DashboardSummary summary;
-  final BreakdownKind kind;
-  final String label;
-  final IconData icon;
-  const _CapitalMovementRow({
-    required this.summary,
-    required this.kind,
-    required this.label,
-    required this.icon,
-  });
-  @override
-  Widget build(BuildContext context) {
-    final breakdown = summary.breakdown(kind);
-    final moneyOut =
-        kind == BreakdownKind.investmentPurchases ||
-        kind == BreakdownKind.savingsDeposits;
-    final movementColor = moneyOut
-        ? Colors.red.shade600
-        : Colors.green.shade600;
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(14),
-      child: ListTile(
-        key: ValueKey(kind),
-        onTap: () => _openBreakdown(context, summary, kind),
-        dense: true,
-        visualDensity: const VisualDensity(vertical: -2),
-        minVerticalPadding: 4,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: Row(
-          children: [
-            Icon(icon, size: 18, color: movementColor),
-            const SizedBox(width: 6),
-            Expanded(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 2),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    _money(breakdown.amount, context),
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: movementColor,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 2),
-              Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      _DashboardPendingValues.of(context)
-                          ? '\u2014 transactions'
-                          : '${breakdown.count} transactions',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _CategorySummarySection extends StatelessWidget {
-  final DashboardSummary summary;
-  final BreakdownKind kind;
-  final String title;
-  final IconData icon;
-  const _CategorySummarySection({
-    required this.summary,
-    required this.kind,
-    required this.title,
-    required this.icon,
-  });
-  @override
-  Widget build(BuildContext context) {
-    final breakdown = summary.breakdown(kind);
-    final expense = kind == BreakdownKind.spending;
-    return InkWell(
-      onTap: () => _openBreakdown(context, summary, kind),
-      borderRadius: BorderRadius.circular(12),
+    final pending = _DashboardPendingValues.of(context);
+    return SlateCard(
+      color: p.hero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(
-                icon,
-                size: 19,
-                color: expense
-                    ? const Color(0xFFD95C5C)
-                    : const Color(0xFF0F9D8A),
+              const Icon(
+                Icons.waterfall_chart_rounded,
+                color: SlateColors.brandBlue,
+                size: 22,
               ),
-              const SizedBox(width: 9),
+              const SizedBox(width: 8),
               Expanded(
-                flex: 3,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontSize:
-                          (Theme.of(context).textTheme.bodyMedium?.fontSize ??
-                              14) +
-                          2,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade700,
-                    ),
-                  ),
+                child: Text(
+                  'Net cash flow',
+                  style: theme.textTheme.titleMedium?.copyWith(color: p.onHero),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 2,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    _money(
-                      expense ? summary.totals.expenses : summary.totals.income,
-                      context,
+              IconButton(
+                tooltip: 'How net cash flow is calculated',
+                icon: Icon(Icons.info_outline, color: p.onHero, size: 20),
+                onPressed: () => showSlateDialog<void>(
+                  context,
+                  builder: (_) => AppDialog(
+                    title: const Text('Understanding cash flow'),
+                    content: const Text(
+                      'Net cash flow = income − ordinary spending − all recorded fees. It excludes savings and investment transfers, loan principal and purpose-unspecified principal. It is not an account balance, investment return or measure of complete history.',
                     ),
-                    textAlign: TextAlign.end,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: expense
-                          ? const Color(0xFFD95C5C)
-                          : const Color(0xFF0F9D8A),
-                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Got it'),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ],
           ),
-          Divider(height: 16, thickness: 1, color: Colors.grey.shade100),
-          if (breakdown.count == 0 && !_DashboardPendingValues.of(context))
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Text('No activity for this period.'),
+          const SizedBox(height: 12),
+          SlateAmount(
+            key: const ValueKey('home.netCashFlow'),
+            amount: summary.totals.netCashFlow,
+            pending: pending,
+            style: theme.textTheme.displaySmall,
+            color: p.onHero,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Income − spending − fees. Not your account balance.',
+            style: theme.textTheme.bodySmall?.copyWith(color: p.onHero),
+          ),
+          const SizedBox(height: 24),
+          Divider(color: p.onHero.withValues(alpha: 0.2), height: 1),
+          const SizedBox(height: 16),
+          _MetricLayout(
+            children: [
+              _Metric(
+                label: 'Income',
+                amount: summary.totals.income,
+                icon: Icons.south_west_rounded,
+                color: p.onHero,
+                iconColor: const Color(0xFF70D9C2),
+                onTap: () => _openBreakdown(
+                  context,
+                  summary,
+                  BreakdownKind.incomeCategories,
+                ),
+              ),
+              _Metric(
+                label: 'Spending',
+                amount: summary.totals.expenses,
+                icon: Icons.north_east_rounded,
+                color: p.onHero,
+                iconColor: const Color(0xFFFFA4AA),
+                onTap: () =>
+                    _openBreakdown(context, summary, BreakdownKind.spending),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _Metric(
+            label: 'Fees',
+            inline: true,
+            amount: summary.totals.fees,
+            icon: Icons.receipt_long_outlined,
+            color: p.onHero,
+            iconColor: SlateColors.brandYellow,
+            onTap: () => showSlateSheet<void>(
+              context,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SlateSectionHeading(
+                    title: 'Recorded fees',
+                    subtitle: 'Fees from all recorded movements in this month',
+                  ),
+                  const SizedBox(height: 16),
+                  SlateAmount(amount: summary.totals.fees),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Fees are separate from ordinary spending and are deducted once in net cash flow. Loan and transfer fees are included; their principal is excluded.',
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _openActivity(
+                        context,
+                        ActivityFilter(period: summary.period),
+                      );
+                    },
+                    child: const Text('Review supporting activity'),
+                  ),
+                ],
+              ),
             ),
-          for (final group in breakdown.groups.take(4))
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Reflow at narrow widths or large text instead of shrinking accessible text.
+class _MetricLayout extends StatelessWidget {
+  final List<Widget> children;
+  const _MetricLayout({required this.children});
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final largeText = MediaQuery.textScalerOf(context).scale(14) > 20;
+      final columns = largeText || constraints.maxWidth < 300
+          ? 1
+          : children.length;
+      final width = (constraints.maxWidth - 16 * (columns - 1)) / columns;
+      return Wrap(
+        spacing: 16,
+        runSpacing: 16,
+        children: [
+          for (final child in children) SizedBox(width: width, child: child),
+        ],
+      );
+    },
+  );
+}
+
+class _Metric extends StatelessWidget {
+  final String label;
+  final double amount;
+  final IconData icon;
+  final Color? color, iconColor;
+  final VoidCallback? onTap;
+  final bool inline;
+  const _Metric({
+    super.key,
+    required this.label,
+    required this.amount,
+    required this.icon,
+    this.color,
+    this.iconColor,
+    this.onTap,
+    this.inline = false,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final p = SlateColors.of(context);
+    final heading = Row(
+      children: [
+        Icon(icon, size: 16, color: iconColor ?? color ?? p.movement),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: color ?? p.muted),
+          ),
+        ),
+      ],
+    );
+    final value = SlateAmount(
+      amount: amount,
+      pending: _DashboardPendingValues.of(context),
+      color: color ?? p.ink,
+      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 16),
+    );
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: inline
+            ? Row(
+                children: [
+                  Expanded(child: heading),
+                  const SizedBox(width: 12),
+                  Flexible(child: value),
+                ],
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [heading, const SizedBox(height: 8), value],
+              ),
+      ),
+    );
+  }
+}
+
+class _CapitalCard extends StatelessWidget {
+  final DashboardSummary summary;
+  final String title, detail;
+  final IconData icon;
+  final List<(BreakdownKind, String)> items;
+  const _CapitalCard({
+    required this.summary,
+    required this.title,
+    required this.detail,
+    required this.icon,
+    required this.items,
+  });
+  @override
+  Widget build(BuildContext context) => SlateCard(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _MovementHeading(title: title, icon: icon),
+        const SizedBox(height: 16),
+        _MetricLayout(
+          children: [
+            for (final item in items)
+              _CapitalMetric(summary: summary, kind: item.$1, label: item.$2),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(detail, style: Theme.of(context).textTheme.bodySmall),
+        if (title == 'Savings')
+          TextButton(
+            onPressed: () => _openBreakdown(
+              context,
+              summary,
+              BreakdownKind.investmentsAndSavings,
+            ),
+            child: const Text('View savings & investments'),
+          ),
+      ],
+    ),
+  );
+}
+
+class _CapitalMetric extends StatelessWidget {
+  final DashboardSummary summary;
+  final BreakdownKind kind;
+  final String label;
+  const _CapitalMetric({
+    required this.summary,
+    required this.kind,
+    required this.label,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final data = summary.breakdown(kind);
+    final outgoing =
+        kind == BreakdownKind.investmentPurchases ||
+        kind == BreakdownKind.savingsDeposits;
+    return Container(
+      decoration: BoxDecoration(
+        color: SlateColors.of(context).inset,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _Metric(
+            key: ValueKey(kind),
+            label: label,
+            amount: data.amount,
+            icon: outgoing
+                ? Icons.north_east_rounded
+                : Icons.south_west_rounded,
+            iconColor: SlateColors.of(context).movement,
+            onTap: () => _openBreakdown(context, summary, kind),
+          ),
+          Text(
+            _DashboardPendingValues.of(context)
+                ? '— transactions'
+                : '${data.count} ${data.count == 1 ? 'transaction' : 'transactions'}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MovementHeading extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  const _MovementHeading({required this.title, required this.icon});
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Icon(icon, color: SlateColors.of(context).movement, size: 22),
+      const SizedBox(width: 10),
+      Expanded(
+        child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+      ),
+    ],
+  );
+}
+
+class _LoanCard extends StatelessWidget {
+  final DashboardSummary summary;
+  const _LoanCard({required this.summary});
+  @override
+  Widget build(BuildContext context) => SlateCard(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _MovementHeading(
+          title: 'Loans',
+          icon: Icons.account_balance_outlined,
+        ),
+        const SizedBox(height: 16),
+        _MetricLayout(
+          children: [
+            _Metric(
+              label: 'Borrowed',
+              amount: summary.totals.borrowed,
+              icon: Icons.add_rounded,
+            ),
+            _Metric(
+              label: 'Repaid',
+              amount: summary.totals.repaid,
+              icon: Icons.remove_rounded,
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Recorded principal only. Borrowing is not income; repayments are not ordinary spending. Outstanding debt is not inferred.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        TextButton(
+          onPressed: () =>
+              _openBreakdown(context, summary, BreakdownKind.loans),
+          child: const Text('View loan breakdown'),
+        ),
+      ],
+    ),
+  );
+}
+
+class _MoneyMovementCard extends StatelessWidget {
+  final DashboardSummary summary;
+  const _MoneyMovementCard({required this.summary});
+  @override
+  Widget build(BuildContext context) => SlateCard(
+    child: InkWell(
+      key: const ValueKey('internal-movement-link'),
+      borderRadius: BorderRadius.circular(12),
+      onTap: () =>
+          _openBreakdown(context, summary, BreakdownKind.internalMovement),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _MovementHeading(
+            title: 'Transfers',
+            icon: Icons.swap_horiz_rounded,
+          ),
+          const SizedBox(height: 16),
+          _MetricLayout(
+            children: [
+              _Metric(
+                label:
+                    'Into ${accountLabel(summary.breakdown(BreakdownKind.internalMovement).filter.central.type)}',
+                amount: summary.totals.transfersIntoCentral,
+                icon: Icons.south_west_rounded,
+              ),
+              _Metric(
+                label:
+                    'From ${accountLabel(summary.breakdown(BreakdownKind.internalMovement).filter.central.type)}',
+                amount: summary.totals.transfersFromCentral,
+                icon: Icons.north_east_rounded,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Transfers between account families. Includes savings and investment movements shown above; these totals are not additive.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 12),
+          const Text('View internal movement breakdown'),
+        ],
+      ),
+    ),
+  );
+}
+
+class _CategoriesCard extends StatelessWidget {
+  final DashboardSummary summary;
+  final BreakdownKind kind;
+  final String title, action;
+  const _CategoriesCard({
+    required this.summary,
+    required this.kind,
+    required this.title,
+    required this.action,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final data = summary.breakdown(kind);
+    final expense = kind == BreakdownKind.spending;
+    final color = expense
+        ? SlateColors.of(context).spending
+        : SlateColors.of(context).income;
+    return SlateCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SlateSectionHeading(
+            title: title,
+            subtitle: 'Transaction types · principal only',
+          ),
+          const SizedBox(height: 12),
+          SlateAmount(
+            amount: expense ? summary.totals.expenses : summary.totals.income,
+            pending: _DashboardPendingValues.of(context),
+            color: color,
+          ),
+          const SizedBox(height: 16),
+          if (data.count == 0 && !_DashboardPendingValues.of(context))
+            const Text('No activity for this period.'),
+          for (final group in data.groups.take(4))
             _PeriodDataVisibility(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: FinancialGroupRow(
-                  key: ValueKey(group.filter),
-                  group: group,
-                  compact: true,
-                  labelStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontSize: 12,
-                    color: Colors.grey.shade700,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  amountStyle: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: expense
-                        ? Colors.red.shade600
-                        : Colors.green.shade600,
-                  ),
-                  showShare: breakdown.amount > 0 && group.amount >= 0,
-                  accentColor: expense
-                      ? Colors.red.shade600
-                      : Colors.green.shade600,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => FinancialBreakdownScreen(
-                        kind: expense
-                            ? BreakdownKind.expenseParties
-                            : BreakdownKind.incomeParties,
-                        filter: group.filter,
-                      ),
+              child: FinancialGroupRow(
+                key: ValueKey(group.filter),
+                group: group,
+                accentColor: color,
+                showShare: data.amount > 0 && group.amount >= 0,
+                labelStyle: Theme.of(context).textTheme.bodyMedium,
+                amountStyle: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(color: color),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => FinancialBreakdownScreen(
+                      kind: expense
+                          ? BreakdownKind.expenseParties
+                          : BreakdownKind.incomeParties,
+                      filter: group.filter,
                     ),
                   ),
                 ),
               ),
             ),
+          const SizedBox(height: 8),
+          OutlinedButton(
+            onPressed: () => _openBreakdown(context, summary, kind),
+            child: Text(action),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PartiesCard extends StatelessWidget {
+  final DashboardSummary summary;
+  final bool expense;
+  const _PartiesCard({required this.summary, required this.expense});
+  @override
+  Widget build(BuildContext context) {
+    final kind = expense
+        ? BreakdownKind.expenseParties
+        : BreakdownKind.incomeParties;
+    final data = summary.breakdown(kind);
+    return SlateCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SlateSectionHeading(
+            title: expense ? 'Top expenses' : 'Top income',
+            subtitle: expense
+                ? 'People and businesses you sent the most to'
+                : 'People and businesses you received the most from',
+          ),
+          const SizedBox(height: 16),
+          if (data.count == 0 && !_DashboardPendingValues.of(context))
+            const Text('No activity for this period.'),
+          for (final group in data.groups.take(5))
+            _PeriodDataVisibility(
+              child: FinancialGroupRow(
+                key: ValueKey(group.filter),
+                group: group,
+                accentColor: expense
+                    ? SlateColors.of(context).spending
+                    : SlateColors.of(context).income,
+                onTap: () => _openActivity(context, group.filter),
+              ),
+            ),
+          const SizedBox(height: 8),
+          OutlinedButton(
+            onPressed: () => _openBreakdown(context, summary, kind),
+            child: Text(
+              'View all ${expense ? 'Expenses' : 'Income'}${_DashboardPendingValues.of(context) ? '' : ' (${data.count})'}',
+            ),
+          ),
         ],
       ),
     );
@@ -1481,47 +844,43 @@ class _ActivityCard extends StatelessWidget {
   final ActivityFilter filter;
   const _ActivityCard({required this.transactions, required this.filter});
   @override
-  Widget build(BuildContext context) => _DashboardCard(
-    child: _CardContents(
+  Widget build(BuildContext context) => SlateCard(
+    padding: const EdgeInsets.symmetric(vertical: 24),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _CardHeader(title: 'Recent activity', icon: Icons.bolt_rounded),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: SlateSectionHeading(
+            title: 'Recent activity',
+            subtitle: 'Latest records in ${periodLabel(filter.period)}',
+          ),
+        ),
         const SizedBox(height: 12),
-        if (transactions.isEmpty && !_DashboardPendingValues.of(context))
-          const Text('No activity for the current month.'),
-        for (var index = 0; index < transactions.length; index++) ...[
-          if (index > 0) const Divider(height: 1, indent: 16, endIndent: 16),
+        for (final record in transactions)
           _PeriodDataVisibility(
             child: TransactionRow(
-              record: transactions[index],
+              record: record,
               central: filter.central,
               fullWidthMetadata: true,
-              nameFontSize: 12,
-              onTap: transactions[index].id == null
+              onTap: record.id == null
                   ? null
                   : () => Navigator.push(
                       context,
                       MaterialPageRoute<void>(
                         builder: (_) => TransactionDetailScreen(
-                          recordId: transactions[index].id!,
+                          recordId: record.id!,
                           central: filter.central,
                         ),
                       ),
                     ),
             ),
           ),
-        ],
-        SizedBox(
-          width: double.infinity,
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
           child: OutlinedButton(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ActivityScreen(
-                  preserveDrillDown: true,
-                  initialFilter: filter,
-                ),
-              ),
-            ),
+            onPressed: () => _openActivity(context, filter),
             child: const Text('View all activity'),
           ),
         ),
@@ -1530,124 +889,24 @@ class _ActivityCard extends StatelessWidget {
   );
 }
 
-class _CardContents extends StatelessWidget {
-  final List<Widget> children;
-  const _CardContents({required this.children});
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      for (var index = 0; index < children.length; index++)
-        if (index == 0)
-          children[index]
-        else
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18),
-            child: children[index],
-          ),
-    ],
-  );
-}
-
-class _CardHeaderSurface extends StatelessWidget {
-  final Widget child;
-  const _CardHeaderSurface({required this.child});
-  @override
-  Widget build(BuildContext context) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-    child: child,
-  );
-}
-
-class _CardHeader extends StatelessWidget {
-  final String title;
-  final IconData icon;
-
-  const _CardHeader({required this.title, required this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return _CardHeaderSurface(
-      child: Row(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: AppTheme.darkBlue.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: Icon(icon, size: 17, color: AppTheme.darkBlue),
-          ),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppTheme.darkBlue,
-              ),
-            ),
-          ),
-        ],
+void _openActivity(BuildContext context, ActivityFilter filter) =>
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            ActivityScreen(preserveDrillDown: true, initialFilter: filter),
       ),
     );
-  }
-}
-
-class _DashboardCard extends StatelessWidget {
-  final Widget child;
-
-  const _DashboardCard({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.only(bottom: 18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFE9EEF0)),
-      ),
-      child: child,
-    );
-  }
-}
-
-class _ErrorState extends StatelessWidget {
-  final VoidCallback onRetry;
-
-  const _ErrorState({required this.onRetry});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.cloud_off_rounded,
-              size: 42,
-              color: Color(0xFF0B1F3A),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Unable to load your financial summary.',
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-String _money(double amount, BuildContext context) =>
-    _DashboardPendingValues.of(context) ? '—' : formatMoney(amount);
+void _openBreakdown(
+  BuildContext context,
+  DashboardSummary summary,
+  BreakdownKind kind,
+) => Navigator.push(
+  context,
+  MaterialPageRoute<void>(
+    builder: (_) => FinancialBreakdownScreen(
+      kind: kind,
+      filter: summary.breakdown(kind).filter,
+    ),
+  ),
+);

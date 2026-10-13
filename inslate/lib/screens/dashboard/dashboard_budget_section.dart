@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/presentation/financial_presentation.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/design/slate_components.dart';
+import '../../widgets/app_dialog.dart';
 import '../../models/financial_period.dart';
 import '../../providers/budgets_provider.dart';
 import '../budgets/budgets_screen.dart';
@@ -34,7 +35,6 @@ class DashboardBudgetSection extends ConsumerWidget {
       ),
     );
     return Card(
-      color: Colors.white,
       surfaceTintColor: Colors.transparent,
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -52,8 +52,8 @@ class DashboardBudgetSection extends ConsumerWidget {
                 IconButton(
                   tooltip: 'About monthly budgets',
                   icon: const Icon(Icons.info_outline, size: 20),
-                  onPressed: () => showDialog<void>(
-                    context: context,
+                  onPressed: () => showSlateDialog<void>(
+                    context,
                     builder: (context) => const _BudgetInformationDialog(),
                   ),
                 ),
@@ -65,11 +65,11 @@ class DashboardBudgetSection extends ConsumerWidget {
               ),
               open('View current-month budgets'),
             ] else ...[
-              Row(
-                children: [
-                  Expanded(child: Text(periodLabel(period))),
-                  open('Manage budgets'),
-                ],
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [Text(periodLabel(period)), open('Manage budgets')],
               ),
               ref
                   .watch(budgetsProvider(period))
@@ -108,25 +108,29 @@ class DashboardBudgetSection extends ConsumerWidget {
                               margin: const EdgeInsets.only(top: 12),
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
-                                color: AppTheme.appBackground,
+                                color: SlateColors.of(context).inset,
                                 borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: Colors.grey.shade200),
+                                border: Border.all(
+                                  color: SlateColors.of(context).line,
+                                ),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     '${p.budget.label}${p.budget.categoryHidden ? ' (hidden)' : ''}',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontWeight: FontWeight.w700,
-                                      color: AppTheme.darkBlue,
+                                      color: SlateColors.of(context).ink,
                                     ),
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
                                     'Target ${formatKesMinor(BigInt.from(p.budget.amountMinor))}',
                                     style: Theme.of(context).textTheme.bodySmall
-                                        ?.copyWith(color: Colors.grey.shade600),
+                                        ?.copyWith(
+                                          color: SlateColors.of(context).muted,
+                                        ),
                                   ),
                                   const SizedBox(height: 12),
                                   if (p.spentMinor == null)
@@ -149,8 +153,12 @@ class DashboardBudgetSection extends ConsumerWidget {
                                           style: TextStyle(
                                             color:
                                                 p.overspentMinor! > BigInt.zero
-                                                ? Colors.deepOrange
-                                                : AppTheme.teal,
+                                                ? SlateColors.of(
+                                                    context,
+                                                  ).attention
+                                                : SlateColors.of(
+                                                    context,
+                                                  ).income,
                                             fontWeight: FontWeight.w600,
                                           ),
                                         ),
@@ -167,9 +175,11 @@ class DashboardBudgetSection extends ConsumerWidget {
                                       minHeight: 6,
                                       borderRadius: BorderRadius.circular(6),
                                       color: p.overspentMinor! > BigInt.zero
-                                          ? Colors.deepOrange
-                                          : AppTheme.teal,
-                                      backgroundColor: Colors.grey.shade200,
+                                          ? SlateColors.of(context).attention
+                                          : SlateColors.of(context).income,
+                                      backgroundColor: SlateColors.of(
+                                        context,
+                                      ).line,
                                     ),
                                     const SizedBox(height: 10),
                                     Text(
@@ -182,8 +192,10 @@ class DashboardBudgetSection extends ConsumerWidget {
                                           ?.copyWith(
                                             color:
                                                 p.overspentMinor! > BigInt.zero
-                                                ? Colors.deepOrange
-                                                : Colors.grey.shade700,
+                                                ? SlateColors.of(
+                                                    context,
+                                                  ).attention
+                                                : SlateColors.of(context).muted,
                                             fontWeight: FontWeight.w600,
                                           ),
                                     ),
@@ -213,108 +225,18 @@ class DashboardBudgetSection extends ConsumerWidget {
 
 class _BudgetInformationDialog extends StatelessWidget {
   const _BudgetInformationDialog();
-
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    const accent = AppTheme.teal;
-    const details = [
-      (
-        'What is included',
-        'Monthly spending uses ordinary expense principal only. Fees are excluded.',
+  Widget build(BuildContext context) => AppDialog(
+    icon: Icons.savings_outlined,
+    title: const Text('About monthly budgets'),
+    content: const Text(
+      'Monthly spending uses ordinary expense principal only; fees are excluded. Budgets are targets, not balances. Overall and category targets overlap, so their spending totals are not additive.',
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Got it'),
       ),
-      (
-        'Targets, not balances',
-        'Budgets are spending targets, not account balances.',
-      ),
-    ];
-    return AlertDialog(
-      backgroundColor: const Color(0xFFF4F7F8),
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-      contentPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-      title: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(Icons.savings_outlined, color: accent, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'About monthly budgets',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: AppTheme.darkBlue,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          IconButton(
-            tooltip: 'Close',
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.close_rounded, color: AppTheme.darkBlue),
-          ),
-        ],
-      ),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (final detail in details) ...[
-              Text(
-                detail.$1,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.darkBlue,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                detail.$2,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey.shade700,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 18),
-            ],
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.darkBlue.withValues(alpha: 0.04),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(
-                    Icons.info_outline,
-                    size: 18,
-                    color: AppTheme.teal,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Overall and category targets overlap; their spending totals are not additive.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppTheme.darkBlue,
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+    ],
+  );
 }

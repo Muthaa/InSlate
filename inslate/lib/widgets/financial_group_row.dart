@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/design/design_tokens.dart';
 import '../models/financial_breakdown.dart';
 import '../core/presentation/financial_presentation.dart';
 
@@ -44,7 +45,7 @@ class FinancialGroupRow extends StatelessWidget {
                           TextStyle(
                             fontSize: compact ? 13 : null,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF0B1F3A),
+                            color: SlateColors.of(context).ink,
                           ),
                     ),
                     if (group.detail != null)
@@ -71,7 +72,7 @@ class FinancialGroupRow extends StatelessWidget {
                       TextStyle(
                         fontSize: compact ? 13 : null,
                         fontWeight: FontWeight.w800,
-                        color: accentColor ?? const Color(0xFF0B1F3A),
+                        color: accentColor ?? SlateColors.of(context).ink,
                       ),
                 ),
               ),
@@ -86,8 +87,8 @@ class FinancialGroupRow extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: group.share.clamp(0, 1),
                     minHeight: 5,
-                    color: accentColor ?? const Color(0xFF0F9D8A),
-                    backgroundColor: const Color(0xFFEFF2F3),
+                    color: accentColor ?? SlateColors.of(context).income,
+                    backgroundColor: SlateColors.of(context).inset,
                   ),
                 ),
                 const SizedBox(width: 12),

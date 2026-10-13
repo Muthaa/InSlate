@@ -15,6 +15,7 @@ import 'package:inslate/models/financial_period.dart';
 import 'package:inslate/models/party.dart';
 import 'package:inslate/providers/financial_summary_provider.dart';
 import 'package:inslate/providers/dashboard_provider.dart';
+import 'package:inslate/providers/database_provider.dart';
 import 'package:inslate/providers/activity_provider.dart';
 import 'package:inslate/providers/repository_providers.dart';
 import 'package:inslate/screens/activity/activity_screen.dart';
@@ -49,6 +50,7 @@ void main() {
     ]);
     container = ProviderContainer(
       overrides: [
+        databaseProvider.overrideWithValue(database),
         financialRecordsRepositoryProvider.overrideWithValue(repository),
       ],
     );
@@ -120,10 +122,10 @@ void main() {
       await tester.pump();
       expect(find.text('Loading this period…'), findsOneWidget);
       expect(find.text('InSlate'), findsOneWidget);
-      expect(find.text('Money movement'), findsNothing);
+      expect(find.text('Net cash flow'), findsNothing);
       pending.complete();
       await tester.pumpAndSettle();
-      expect(find.text('Money movement'), findsOneWidget);
+      expect(find.text('Net cash flow'), findsOneWidget);
     },
   );
 
@@ -161,7 +163,7 @@ void main() {
         find.text('Unable to load your financial summary.'),
         findsOneWidget,
       );
-      expect(find.text('Money movement'), findsNothing);
+      expect(find.text('Net cash flow'), findsNothing);
     },
   );
 
@@ -171,30 +173,30 @@ void main() {
       await open(tester);
       final header = tester.element(find.text('InSlate'));
       final monthRow = tester.element(find.text('Sep'));
-      final movementCard = tester.element(find.text('Money movement'));
+      final movementCard = tester.element(find.text('Net cash flow'));
       final pending = Completer<void>();
       repository.pendingRead = pending.future;
       container.read(selectedMonthProvider.notifier).state = DateTime(2026, 8);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 1));
       expect(container.read(dashboardSummaryProvider).isLoading, isTrue);
-      expect(tester.element(find.text('Money movement')), same(movementCard));
+      expect(tester.element(find.text('Net cash flow')), same(movementCard));
       expect(find.byType(CircularProgressIndicator), findsNothing);
       expect(find.text('Loading this period…'), findsNothing);
       expect(find.text('—'), findsWidgets);
-      final receivedRow = find
-          .ancestor(of: find.text('Received'), matching: find.byType(Column))
+      final incomeMetric = find
+          .ancestor(of: find.text('Income'), matching: find.byType(Column))
           .first;
       expect(
-        find.descendant(of: receivedRow, matching: find.text('KSh 1,000.00')),
+        find.descendant(of: incomeMetric, matching: find.text('KSh 1,000.00')),
         findsNothing,
       );
       expect(tester.element(find.text('InSlate')), same(header));
       expect(tester.element(find.text('Sep')), same(monthRow));
       pending.complete();
       await tester.pumpAndSettle();
-      expect(find.text('Money movement'), findsOneWidget);
-      expect(tester.element(find.text('Money movement')), same(movementCard));
+      expect(find.text('Your story starts with a record'), findsOneWidget);
+      expect(find.byKey(const ValueKey('home.netCashFlow')), findsNothing);
       expect(tester.element(find.text('InSlate')), same(header));
       expect(tester.element(find.text('Sep')), same(monthRow));
       expect(
@@ -207,26 +209,40 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 1));
       expect(tester.element(find.text('InSlate')), same(header));
-      expect(tester.element(find.text('Sep')), same(monthRow));
       expect(find.text('2025'), findsOneWidget);
-      expect(tester.element(find.text('Money movement')), same(movementCard));
-      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text('Loading this period…'), findsOneWidget);
+      expect(find.text('Your story starts with a record'), findsNothing);
       pendingYear.complete();
       await tester.pumpAndSettle();
-      expect(tester.element(find.text('InSlate')), same(header));
-      expect(find.text('Money movement'), findsOneWidget);
+      expect(find.text('Your story starts with a record'), findsOneWidget);
     },
   );
 
   testDashboardWidgets(
-    'headline values are principal-only and historical month hides recent rows',
+    'headline values preserve semantics and historical activity can be explored',
     (tester) async {
       await open(tester);
       expect(repository.periodReads, 1);
-      expect(find.text('Into M-PESA'), findsOneWidget);
-      expect(find.text('From M-PESA'), findsOneWidget);
+      final hero = find.byWidgetPredicate(
+        (w) => w.runtimeType.toString() == '_OverviewCard',
+      );
+      for (final value in [
+        'KSh 1,000.00',
+        'KSh 500.00',
+        'KSh 23.13',
+        'KSh 476.87',
+      ]) {
+        expect(
+          find.descendant(of: hero, matching: find.text(value)),
+          findsOneWidget,
+        );
+      }
+      expect(
+        find.text('Income − spending − fees. Not your account balance.'),
+        findsOneWidget,
+      );
       await tester.scrollUntilVisible(
-        find.text('Expenses'),
+        find.text('Recent activity'),
         250,
         scrollable: find
             .byWidgetPredicate(
@@ -234,31 +250,8 @@ void main() {
             )
             .first,
       );
-      await tester.pumpAndSettle();
-      final expenses = find
-          .ancestor(of: find.text('Expenses'), matching: find.byType(Row))
-          .first;
-      expect(
-        find.descendant(of: expenses, matching: find.text('KSh 500.00')),
-        findsOneWidget,
-      );
-      final fees = find
-          .ancestor(of: find.text('Fees'), matching: find.byType(Row))
-          .first;
-      expect(
-        find.descendant(of: fees, matching: find.text('KSh 23.13')),
-        findsOneWidget,
-      );
-      final cash = find
-          .ancestor(of: find.text('Net cash flow'), matching: find.byType(Row))
-          .first;
-      expect(
-        find.descendant(of: cash, matching: find.text('KSh 476.87')),
-        findsOneWidget,
-      );
-      expect(find.text('Net movement'), findsNothing);
-      expect(find.byType(TransactionRow), findsNothing);
-      expect(find.text('Recent activity'), findsNothing);
+      expect(find.text('Recent activity'), findsOneWidget);
+      expect(find.byType(TransactionRow), findsWidgets);
     },
   );
 
@@ -394,8 +387,10 @@ void main() {
     'internal movement opens family/direction grouping before Activity',
     (tester) async {
       await open(tester);
-      await tester.tap(find.byKey(const ValueKey('internal-movement-link')));
-      await tester.pumpAndSettle();
+      await tapVisible(
+        tester,
+        find.byKey(const ValueKey('internal-movement-link')),
+      );
       expect(find.text('Into M-PESA'), findsOneWidget);
       await tapVisible(
         tester,
@@ -558,7 +553,7 @@ void main() {
           FinancialPeriod.month(DateTime.now()).start;
       await open(tester);
       await tester.scrollUntilVisible(
-        find.text('No activity for the current month.'),
+        find.text('Your story starts with a record'),
         300,
         scrollable: find
             .byWidgetPredicate(
@@ -568,7 +563,7 @@ void main() {
             )
             .first,
       );
-      expect(find.text('No activity for the current month.'), findsOneWidget);
+      expect(find.text('Your story starts with a record'), findsOneWidget);
       expect(find.byType(TransactionRow), findsNothing);
     },
   );
@@ -710,12 +705,27 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(
+          find.text(
+            kind == BreakdownKind.internalMovement
+                ? 'Total internal movement'
+                : kind == BreakdownKind.loans
+                ? 'Loan activity'
+                : kind == BreakdownKind.investmentsAndSavings
+                ? 'Savings & investment activity'
+                : 'Total contributions & withdrawals',
+          ),
+          100,
+          scrollable: find.byType(Scrollable).first,
+        );
         expect(
           find.text(
             kind == BreakdownKind.internalMovement
                 ? 'Total internal movement'
                 : kind == BreakdownKind.loans
-                ? 'Total loan activity'
+                ? 'Loan activity'
+                : kind == BreakdownKind.investmentsAndSavings
+                ? 'Savings & investment activity'
                 : 'Total contributions & withdrawals',
           ),
           findsOneWidget,

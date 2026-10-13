@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
+import '../core/design/design_tokens.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'insights/insights_screen.dart';
 import 'profile/profile_screen.dart';
@@ -87,17 +88,17 @@ class _AppShellState extends ConsumerState<AppShell>
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: AppTheme.appBackground,
-          border: Border(top: BorderSide(color: Color(0xFFE8ECEF), width: 1)),
+        decoration: BoxDecoration(
+          color: SlateColors.of(context).surface,
+          border: Border(top: BorderSide(color: SlateColors.of(context).line)),
         ),
         child: NavigationBar(
-          backgroundColor: AppTheme.appBackground,
+          backgroundColor: SlateColors.of(context).surface,
           elevation: 0,
           height: 72,
           selectedIndex: _currentIndex,
           onDestinationSelected: _selectTab,
-          indicatorColor: AppTheme.teal.withValues(alpha: 0.12),
+          indicatorColor: SlateColors.of(context).inset,
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
           destinations: const [
             NavigationDestination(
