@@ -1,6 +1,5 @@
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
-import 'package:inslate/core/design/slate_components.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inslate/database/app_database.dart';
@@ -94,28 +93,20 @@ void main() {
         find.descendant(of: panel, matching: find.text('Food & groceries')),
         findsNothing,
       );
-      final spending = find.text('Expense categories');
-      await scrollTo(tester, spending);
-      final categories = find.ancestor(
-        of: spending,
-        matching: find.byWidgetPredicate(
-          (w) => w.runtimeType.toString() == '_CategoriesCard',
-        ),
+      final overview = find.byWidgetPredicate(
+        (w) => w.runtimeType.toString() == '_OverviewCard',
       );
       expect(
         find.descendant(
-          of: categories,
-          matching: find.descendant(
-            of: find.byType(SlateAmount),
-            matching: find.text('KSh 10.00'),
-          ),
+          of: find
+              .ancestor(
+                of: find.text('Expense categories'),
+                matching: find.byType(Row),
+              )
+              .first,
+          matching: find.text('KSh 10.00'),
         ),
         findsOneWidget,
-      );
-      await tester.drag(find.byType(Scrollable).first, const Offset(0, 5000));
-      await tester.pumpAndSettle();
-      final overview = find.byWidgetPredicate(
-        (w) => w.runtimeType.toString() == '_OverviewCard',
       );
       expect(
         find.descendant(of: overview, matching: find.text('KSh 5.00')),

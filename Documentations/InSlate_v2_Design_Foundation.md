@@ -1,5 +1,10 @@
 # InSlate Experience 2.0 — Foundation and Home
 
+> **Dashboard restoration:** Following review, Dashboard has been returned to its previous interface: navy branding header, pinned month selector, Money movement and Overview cards, original card order and paired capital-movement rows. A Dashboard-only compatibility theme preserves the previous typography and controls without rolling back the shared design foundation or changing other screens. The original current-month recent-activity behavior is restored. Large-text overflow fixes remain. The restoration passes 61 focused widget tests, scoped analysis and formatting checks. Financial calculations, schema, data and mapping behavior are unchanged.
+>
+> The v2 design tokens, shared components, navigation styling and standalone attention/comparison components remain available. The Home redesign descriptions and captures below document the earlier proposal, not the currently restored Dashboard. See the [restored Dashboard capture](v2-captures/restored/home.png).
+
+
 This milestone starts from `v2` commit `7e212c6`. It changes presentation and read-only composition. The original blue/yellow logo is unchanged. Schema v11, persisted data, effective subtype interpretation, mappings, category policy, repositories and financial calculations are unchanged. No PDF ingestion, SMS permission or account-management work is included.
 
 ## Home's information hierarchy

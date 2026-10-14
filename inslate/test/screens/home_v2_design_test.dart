@@ -102,39 +102,23 @@ void main() {
           record(RecordSubtype.mshwariDeposit, 50, date: selected.start),
         ]);
         await open(tester, dark: dark);
-        expect(
-          find.descendant(
-            of: find.byKey(const ValueKey('home.netCashFlow')),
-            matching: find.text('-KSh 115.00'),
-          ),
-          findsOneWidget,
-        );
-        expect(
-          find.text('Income − spending − fees. Not your account balance.'),
-          findsOneWidget,
-        );
+        await reveal(tester, find.text('Net cash flow'));
+        expect(find.text('-KSh 115.00'), findsOneWidget);
         await reveal(tester, find.text('Loans'));
         expect(find.text('KSh 900.00'), findsOneWidget);
-        expect(find.textContaining('Borrowing is not income'), findsOneWidget);
         expect(tester.takeException(), isNull);
       },
     );
   }
-  homeTest(
-    'empty selected month offers truthful guidance without fabricated figures',
-    (tester) async {
-      await open(tester);
-      expect(find.text('Your story starts with a record'), findsOneWidget);
-      expect(find.byKey(const ValueKey('home.netCashFlow')), findsNothing);
-      expect(find.text('KSh 0.00'), findsNothing);
-      expect(
-        find.text(
-          'No financial records for this month. Choose a month with activity to see your income, spending and money movements.',
-        ),
-        findsOneWidget,
-      );
-    },
-  );
+  homeTest('previous Dashboard retains its truthful empty summaries', (
+    tester,
+  ) async {
+    await open(tester);
+    expect(find.text('Money movement'), findsOneWidget);
+    await reveal(tester, find.text('Net cash flow'));
+    expect(find.text('KSh 0.00'), findsWidgets);
+    expect(find.text('No activity for this period.'), findsWidgets);
+  });
 
   for (final size in [const Size(320, 900), const Size(1280, 1000)]) {
     homeTest('Home reflows at ${size.width} with 200 percent text', (
@@ -149,10 +133,10 @@ void main() {
       ]);
       await open(tester, dark: true, scale: 2);
       expect(tester.takeException(), isNull);
-      await reveal(tester, find.text('View all activity'));
+      await reveal(tester, find.text('View savings & investments'));
       expect(tester.takeException(), isNull);
       final scroll = tester.getSize(find.byType(CustomScrollView).first);
-      expect(scroll.width, lessThanOrEqualTo(SlateSpace.pageWidth));
+      expect(scroll.width, size.width);
     });
   }
   homeTest(
@@ -242,25 +226,6 @@ void main() {
             .period,
         previous,
       );
-    },
-  );
-  homeTest(
-    'cash-flow explanation is shared, dismissible and leaves data unchanged',
-    (tester) async {
-      await save(tester, [
-        record(RecordSubtype.receiveMoney, 100, date: selected.start),
-      ]);
-      await open(tester);
-      await tester.tap(find.byTooltip('How net cash flow is calculated'));
-      await tester.pumpAndSettle();
-      expect(find.byType(AppDialog), findsOneWidget);
-      expect(
-        find.textContaining('It excludes savings and investment transfers'),
-        findsOneWidget,
-      );
-      await tester.tap(find.text('Got it'));
-      await tester.pumpAndSettle();
-      expect(find.text('KSh 100.00'), findsWidgets);
     },
   );
   homeTest('reduced motion confirmations treat dismissal as cancellation', (

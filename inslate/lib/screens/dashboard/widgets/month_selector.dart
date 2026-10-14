@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/design/slate_components.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../providers/financial_summary_provider.dart';
 import '../../../providers/financial_records_provider.dart';
 
@@ -59,8 +59,7 @@ class _MonthSelectorState extends ConsumerState<MonthSelector> {
 
     final index = selectedMonth.month - 1;
 
-    final itemWidth =
-        64.0 * MediaQuery.textScalerOf(context).scale(14) / 14 + 8;
+    const itemWidth = 72.0;
 
     final targetOffset =
         (index * itemWidth) -
@@ -152,7 +151,6 @@ class _MonthSelectorState extends ConsumerState<MonthSelector> {
 
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final palette = SlateColors.of(context);
 
     if (range == null) {
       return const SizedBox(
@@ -187,7 +185,7 @@ class _MonthSelectorState extends ConsumerState<MonthSelector> {
     final canGoNext = selectedYear < maxYear && selectedYear < now.year;
 
     return Container(
-      color: palette.canvas,
+      color: AppTheme.appBackground,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -200,7 +198,7 @@ class _MonthSelectorState extends ConsumerState<MonthSelector> {
                           _changeYear(-1, selectedMonth, range.start, range.end)
                     : null,
                 icon: const Icon(Icons.chevron_left_rounded),
-                tooltip: 'Previous year',
+                visualDensity: VisualDensity.compact,
               ),
               Text(
                 '$selectedYear',
@@ -215,13 +213,13 @@ class _MonthSelectorState extends ConsumerState<MonthSelector> {
                           _changeYear(1, selectedMonth, range.start, range.end)
                     : null,
                 icon: const Icon(Icons.chevron_right_rounded),
-                tooltip: 'Next year',
+                visualDensity: VisualDensity.compact,
               ),
             ],
           ),
           const SizedBox(height: 4),
           SizedBox(
-            height: 48 * MediaQuery.textScalerOf(context).scale(14) / 14,
+            height: 46,
             child: ListView.builder(
               controller: _scrollController,
               scrollDirection: Axis.horizontal,
@@ -241,14 +239,51 @@ class _MonthSelectorState extends ConsumerState<MonthSelector> {
 
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: SizedBox(
-                    width: 64 * MediaQuery.textScalerOf(context).scale(14) / 14,
-                    child: SlateChoice(
-                      label: _months[index],
-                      selected: isSelected,
-                      onSelected: isAvailable
-                          ? () => _selectMonth(month, availableMonths)
-                          : null,
+                  child: GestureDetector(
+                    onTap: isAvailable
+                        ? () => _selectMonth(month, availableMonths)
+                        : null,
+                    child: Container(
+                      width: 64,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppTheme.darkTeal
+                            : isAvailable
+                            ? Colors.white
+                            : const Color(0xFFF4F7F8),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isSelected
+                              ? AppTheme.darkTeal
+                              : const Color(0xFFE7EEF2),
+                          width: isSelected ? 0 : 1,
+                        ),
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: AppTheme.darkBlue.withValues(
+                                    alpha: 0.12,
+                                  ),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: Text(
+                        _months[index],
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontWeight: isSelected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: isSelected
+                              ? Colors.white
+                              : isAvailable
+                              ? AppTheme.darkTeal
+                              : AppTheme.darkTeal.withValues(alpha: 0.35),
+                        ),
+                      ),
                     ),
                   ),
                 );
