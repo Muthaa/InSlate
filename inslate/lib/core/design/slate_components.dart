@@ -233,13 +233,16 @@ Future<T?> showSlateSheet<T>(BuildContext context, {required Widget child}) =>
         duration: SlateMotion.duration(context),
         reverseDuration: SlateMotion.duration(context),
       ),
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(SlateSpace.xl),
-          child: child,
+      builder: (context) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(SlateSpace.xl),
+            child: child,
+          ),
         ),
       ),
     );

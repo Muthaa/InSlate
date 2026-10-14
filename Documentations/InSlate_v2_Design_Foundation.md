@@ -5,6 +5,9 @@
 > The v2 design tokens, shared components, navigation styling and standalone attention/comparison components remain available. The Home redesign descriptions and captures below document the earlier proposal, not the currently restored Dashboard. See the [restored Dashboard capture](v2-captures/restored/home.png).
 
 
+See [navigation and device-safe layout](Navigation_and_Device_Insets.md) for the app-wide phone-navigation, tab-bar and keyboard inset policy.
+
+
 This milestone starts from `v2` commit `7e212c6`. It changes presentation and read-only composition. The original blue/yellow logo is unchanged. Schema v11, persisted data, effective subtype interpretation, mappings, category policy, repositories and financial calculations are unchanged. No PDF ingestion, SMS permission or account-management work is included.
 
 ## Home's information hierarchy

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
 import 'screens/startup_screen.dart';
+import 'widgets/app_viewport.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,6 +19,7 @@ class InSlateApp extends StatelessWidget {
       title: 'InSlate',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
+      builder: (context, child) => AppViewport(child: child!),
       home: const StartupScreen(),
     );
   }
