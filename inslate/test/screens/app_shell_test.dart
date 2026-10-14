@@ -9,7 +9,6 @@ import 'package:inslate/models/import_progress.dart';
 import 'package:inslate/core/presentation/financial_presentation.dart';
 import 'package:inslate/models/financial_period.dart';
 import 'package:inslate/screens/insights/insights_screen.dart';
-import 'package:inslate/screens/dashboard/dashboard_screen.dart';
 import 'package:inslate/providers/financial_records_provider.dart';
 import 'package:inslate/providers/financial_summary_provider.dart';
 import 'package:inslate/providers/import_provider.dart';
@@ -259,7 +258,7 @@ void main() {
     },
   );
   testWidgets(
-    'Dashboard Insights action reuses the tab and adopts Dashboard period',
+    'Dashboard avatar opens the Profile tab and updates after selection',
     (tester) async {
       final database = AppDatabase.forTesting(NativeDatabase.memory());
       try {
@@ -273,6 +272,58 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
+        final shortcut = find.byKey(const ValueKey('dashboard.profile'));
+        expect(
+          find.descendant(
+            of: shortcut,
+            matching: find.byIcon(Icons.rocket_launch_rounded),
+          ),
+          findsOneWidget,
+        );
+        await tester.tap(shortcut);
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<NavigationBar>(find.byType(NavigationBar))
+              .selectedIndex,
+          3,
+        );
+        expect(find.text('Manage your finances'), findsOneWidget);
+        expect(
+          Navigator.of(
+            tester.element(find.text('Manage your finances')),
+          ).canPop(),
+          isFalse,
+        );
+        final budgets = tester.getRect(
+          find.byKey(const ValueKey('profile.menu.Budgets')),
+        );
+        final data = tester.getRect(
+          find.byKey(const ValueKey('profile.menu.Your Data')),
+        );
+        expect(budgets.top, data.top);
+        expect(budgets.right, lessThan(data.left));
+        await tester.tap(find.byTooltip('Change avatar'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.byKey(const ValueKey('avatar.face')));
+        await tester.tap(find.byKey(const ValueKey('avatar.face')));
+        await tester.pumpAndSettle();
+        expect(find.text('Choose your avatar'), findsNothing);
+        await tester.tap(
+          find.descendant(
+            of: find.byType(NavigationBar),
+            matching: find.byIcon(Icons.dashboard_outlined),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(
+            of: shortcut,
+            matching: find.byIcon(Icons.face_rounded),
+          ),
+          findsOneWidget,
+        );
+        // Insights remains available from its own destination.
         await tester.tap(
           find.descendant(
             of: find.byType(NavigationBar),
@@ -280,63 +331,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        await tester.tap(
-          find.byType(DropdownButtonFormField<InsightPeriodChoice>),
-        );
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Previous month').last);
-        await tester.pumpAndSettle();
-        await tester.tap(
-          find.descendant(
-            of: find.byType(NavigationBar),
-            matching: find.byIcon(Icons.dashboard_outlined),
-          ),
-        );
-        await tester.pumpAndSettle();
-        final dashboard = tester.element(find.byType(DashboardScreen));
-        final scope = ProviderScope.containerOf(dashboard);
-        final current = FinancialPeriod.month(DateTime.now());
-        expect(scope.read(selectedMonthProvider), current.start);
-        await tester.tap(find.byKey(const ValueKey('dashboard.insights')));
-        await tester.pumpAndSettle();
-        expect(
-          find.byType(InsightsScreen, skipOffstage: false),
-          findsOneWidget,
-        );
-        expect(
-          tester
-              .widget<NavigationBar>(find.byType(NavigationBar))
-              .selectedIndex,
-          2,
-        );
-        expect(
-          Navigator.of(tester.element(find.byType(InsightsScreen))).canPop(),
-          isFalse,
-        );
-        expect(find.text(periodLabel(current)), findsOneWidget);
-
-        // Repeating the same Dashboard period must also replace a user-selected
-        // Insights period without replacing the tab's state or pushing a route.
-        await tester.tap(
-          find.byType(DropdownButtonFormField<InsightPeriodChoice>),
-        );
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Previous month').last);
-        await tester.pumpAndSettle();
-        await tester.tap(
-          find.descendant(
-            of: find.byType(NavigationBar),
-            matching: find.byIcon(Icons.dashboard_outlined),
-          ),
-        );
-        await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const ValueKey('dashboard.insights')));
-        await tester.pumpAndSettle();
-        expect(find.text(periodLabel(current)), findsOneWidget);
-        expect(
-          find.byType(InsightsScreen, skipOffstage: false),
-          findsOneWidget,
-        );
+        expect(find.byType(InsightsScreen), findsOneWidget);
       } finally {
         await tester.pump(Duration.zero);
         await tester.runAsync(() => database.close());

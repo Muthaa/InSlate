@@ -15,7 +15,7 @@ class AppPreferences {
     return LocalAvatar.values
             .where((value) => value.name == saved)
             .firstOrNull ??
-        LocalAvatar.robot;
+        LocalAvatar.astronaut;
   }
 
   Future<void> setLocalAvatar(LocalAvatar avatar) async {

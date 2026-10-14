@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'financial_breakdown_screen.dart';
 import 'dashboard_budget_section.dart';
 import '../../widgets/unspecified_movements_card.dart';
-import '../insights/insights_screen.dart';
+import '../profile/profile_overview_screen.dart';
+import '../../providers/app_preferences_provider.dart';
+import '../../services/app_preferences.dart';
+import '../../widgets/local_avatar_button.dart';
 import '../activity/activity_screen.dart';
 import '../activity/transaction_detail_screen.dart';
 import '../../models/activity_filter.dart';
@@ -23,19 +26,19 @@ import 'widgets/month_selector.dart';
 import 'dashboard_theme.dart';
 
 class DashboardScreen extends StatelessWidget {
-  final void Function(FinancialPeriod)? onOpenInsights;
-  const DashboardScreen({super.key, this.onOpenInsights});
+  final VoidCallback? onOpenProfile;
+  const DashboardScreen({super.key, this.onOpenProfile});
 
   @override
   Widget build(BuildContext context) => Theme(
     data: DashboardTheme.light(),
-    child: _DashboardView(onOpenInsights: onOpenInsights),
+    child: _DashboardView(onOpenProfile: onOpenProfile),
   );
 }
 
 class _DashboardView extends ConsumerWidget {
-  final void Function(FinancialPeriod)? onOpenInsights;
-  const _DashboardView({this.onOpenInsights});
+  final VoidCallback? onOpenProfile;
+  const _DashboardView({this.onOpenProfile});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -53,14 +56,14 @@ class _DashboardView extends ConsumerWidget {
               pinned: true,
               delegate: _DashboardStickyHeaderDelegate(
                 height: _DashboardHeader.stickyExtent(context),
-                onOpenInsights: () {
-                  if (onOpenInsights != null) {
-                    onOpenInsights!(period);
+                onOpenProfile: () {
+                  if (onOpenProfile != null) {
+                    onOpenProfile!();
                   } else {
                     Navigator.push(
                       context,
                       MaterialPageRoute<void>(
-                        builder: (_) => InsightsScreen(initialPeriod: period),
+                        builder: (_) => const ProfileOverviewScreen(),
                       ),
                     );
                   }
@@ -236,10 +239,10 @@ class _DashboardContent extends StatelessWidget {
 
 class _DashboardStickyHeaderDelegate extends SliverPersistentHeaderDelegate {
   final double height;
-  final VoidCallback onOpenInsights;
+  final VoidCallback onOpenProfile;
   _DashboardStickyHeaderDelegate({
     required this.height,
-    required this.onOpenInsights,
+    required this.onOpenProfile,
   });
 
   @override
@@ -258,7 +261,7 @@ class _DashboardStickyHeaderDelegate extends SliverPersistentHeaderDelegate {
       color: const Color(0xFFF4F7F8),
       child: Column(
         children: [
-          _DashboardHeader(onOpenInsights: onOpenInsights),
+          _DashboardHeader(onOpenProfile: onOpenProfile),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
             child: const MonthSelector(),
@@ -271,13 +274,13 @@ class _DashboardStickyHeaderDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(covariant _DashboardStickyHeaderDelegate oldDelegate) {
     return oldDelegate.height != height ||
-        oldDelegate.onOpenInsights != onOpenInsights;
+        oldDelegate.onOpenProfile != onOpenProfile;
   }
 }
 
-class _DashboardHeader extends StatelessWidget {
-  final VoidCallback onOpenInsights;
-  const _DashboardHeader({required this.onOpenInsights});
+class _DashboardHeader extends ConsumerWidget {
+  final VoidCallback onOpenProfile;
+  const _DashboardHeader({required this.onOpenProfile});
 
   // Keep the top section compact, allowing its header text to wrap without
   // clipping at narrow widths or larger accessibility text sizes.
@@ -313,7 +316,7 @@ class _DashboardHeader extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
 
     return Container(
@@ -376,9 +379,21 @@ class _DashboardHeader extends StatelessWidget {
             ),
           ),
           IconButton(
-            key: const ValueKey('dashboard.insights'),
-            onPressed: onOpenInsights,
-            icon: const Icon(Icons.insights, color: Colors.lightBlue, size: 28),
+            key: const ValueKey('dashboard.profile'),
+            tooltip: 'Open profile',
+            onPressed: onOpenProfile,
+            icon: CircleAvatar(
+              radius: 20,
+              backgroundColor: const Color(0xFF38B6FF).withValues(alpha: 0.18),
+              child: Icon(
+                localAvatarIcon(
+                  ref.watch(appPreferencesProvider).valueOrNull?.localAvatar ??
+                      LocalAvatar.astronaut,
+                ),
+                color: const Color(0xFFFFDE59),
+                size: 24,
+              ),
+            ),
           ),
         ],
       ),

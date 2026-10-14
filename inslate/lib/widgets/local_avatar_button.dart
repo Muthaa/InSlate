@@ -28,6 +28,8 @@ class LocalAvatarButton extends ConsumerWidget {
         onTap: () => showModalBottomSheet<void>(
           context: context,
           showDragHandle: true,
+          isScrollControlled: true,
+          useSafeArea: true,
           builder: (_) => const _AvatarPicker(),
         ),
         child: CircleAvatar(
@@ -100,66 +102,77 @@ class _AvatarPickerState extends ConsumerState<_AvatarPicker> {
               style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
             ),
             const SizedBox(height: 20),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                for (final avatar in LocalAvatar.values)
-                  SizedBox(
-                    width: (MediaQuery.sizeOf(context).width - 64) / 3,
-                    child: OutlinedButton(
-                      key: ValueKey('avatar.${avatar.name}'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        foregroundColor: AppTheme.darkBlue,
-                        backgroundColor: avatar == selected
-                            ? AppTheme.teal.withValues(alpha: 0.12)
-                            : Colors.white,
-                        side: BorderSide(
-                          color: avatar == selected
-                              ? AppTheme.teal
-                              : Colors.grey.shade300,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      onPressed: _saving ? null : () => _choose(avatar),
-                      child: Column(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final columns =
+                    constraints.maxWidth < 300 ||
+                        MediaQuery.textScalerOf(context).scale(16) > 22
+                    ? 2
+                    : 3;
+                return Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    for (final avatar in LocalAvatar.values)
+                      SizedBox(
+                        width:
+                            (constraints.maxWidth - 12 * (columns - 1)) /
+                            columns,
+                        child: OutlinedButton(
+                          key: ValueKey('avatar.${avatar.name}'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            foregroundColor: AppTheme.darkBlue,
+                            backgroundColor: avatar == selected
+                                ? AppTheme.teal.withValues(alpha: 0.12)
+                                : Colors.white,
+                            side: BorderSide(
                               color: avatar == selected
                                   ? AppTheme.teal
-                                  : AppTheme.appBackground,
-                              shape: BoxShape.circle,
+                                  : Colors.grey.shade300,
                             ),
-                            child: Icon(
-                              localAvatarIcon(avatar),
-                              size: 32,
-                              color: avatar == selected
-                                  ? Colors.white
-                                  : AppTheme.darkBlue,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            avatar == LocalAvatar.astronaut
-                                ? 'Rocket'
-                                : '${avatar.name[0].toUpperCase()}${avatar.name.substring(1)}',
+                          onPressed: _saving ? null : () => _choose(avatar),
+                          child: Column(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: avatar == selected
+                                      ? AppTheme.teal
+                                      : AppTheme.appBackground,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  localAvatarIcon(avatar),
+                                  size: 32,
+                                  color: avatar == selected
+                                      ? Colors.white
+                                      : AppTheme.darkBlue,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                avatar == LocalAvatar.astronaut
+                                    ? 'Rocket'
+                                    : '${avatar.name[0].toUpperCase()}${avatar.name.substring(1)}',
+                              ),
+                              if (avatar == selected)
+                                const Icon(
+                                  Icons.check,
+                                  size: 16,
+                                  color: AppTheme.teal,
+                                ),
+                            ],
                           ),
-                          if (avatar == selected)
-                            const Icon(
-                              Icons.check,
-                              size: 16,
-                              color: AppTheme.teal,
-                            ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
-              ],
+                  ],
+                );
+              },
             ),
             if (_saving)
               const Padding(

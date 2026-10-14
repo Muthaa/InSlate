@@ -1,0 +1,281 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/design/design_tokens.dart';
+import '../../providers/app_preferences_provider.dart';
+import '../../widgets/local_avatar_button.dart';
+import 'profile_screen.dart';
+import 'your_data_screen.dart';
+import '../budgets/budgets_screen.dart';
+import '../categories/categories_screen.dart';
+import '../instruments/financial_instruments_screen.dart';
+
+class ProfileOverviewScreen extends ConsumerWidget {
+  const ProfileOverviewScreen({super.key});
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => Scaffold(
+    backgroundColor: SlateColors.of(context).canvas,
+    appBar: AppBar(
+      title: const Row(
+        children: [
+          Icon(Icons.person_rounded, size: 24),
+          SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Profile'),
+                Text(
+                  'Your profile, preferences and local data',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11, color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      backgroundColor: AppTheme.darkBlue,
+      foregroundColor: Colors.white,
+    ),
+    body: ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        ref
+            .watch(appPreferencesProvider)
+            .when(
+              loading: () => const Padding(
+                padding: EdgeInsets.all(24),
+                child: Text('Loading local profile...'),
+              ),
+              error: (_, _) => ListTile(
+                title: const Text('Unable to load your local profile'),
+                trailing: IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () => ref.invalidate(appPreferencesProvider),
+                ),
+              ),
+              data: (preferences) => Container(
+                padding: const EdgeInsets.all(20),
+                margin: const EdgeInsets.only(bottom: 24),
+                decoration: BoxDecoration(
+                  color: AppTheme.darkBlue.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        LocalAvatarButton(avatar: preferences.localAvatar),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                preferences.localDisplayName ??
+                                    'Your local profile',
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Personal finances, on your device',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Edit local profile',
+                          icon: const Icon(
+                            Icons.edit_outlined,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute<void>(
+                              builder: (_) => const ProfileScreen(),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const Row(
+                      children: [
+                        Icon(
+                          Icons.phonelink_lock_outlined,
+                          color: Colors.white70,
+                          size: 16,
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Stored locally. No online account or cloud sync.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Text(
+            'Manage your finances',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: SlateColors.of(context).ink,
+            ),
+          ),
+        ),
+        const _FinanceGrid(),
+      ],
+    ),
+  );
+}
+
+class _FinanceGrid extends StatelessWidget {
+  const _FinanceGrid();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = SlateColors.of(context);
+    final items = [
+      (
+        title: 'Budgets',
+        subtitle: 'Monthly expense targets',
+        icon: Icons.savings_outlined,
+        accent: colors.income,
+        screen: const BudgetsScreen(),
+      ),
+      (
+        title: 'Your Data',
+        subtitle: 'Review what is stored on this device',
+        icon: Icons.storage_outlined,
+        accent: colors.movement,
+        screen: const YourDataScreen(),
+      ),
+      (
+        title: 'Categories',
+        subtitle: 'Manage income and expense categories',
+        icon: Icons.category_outlined,
+        accent: colors.attention,
+        screen: const CategoriesScreen(),
+      ),
+      (
+        title: 'Financial Instruments',
+        subtitle: 'Manage your registered accounts and products',
+        icon: Icons.account_balance_outlined,
+        accent: colors.movement,
+        screen: const FinancialInstrumentsScreen(),
+      ),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns =
+            constraints.maxWidth < 340 ||
+                MediaQuery.textScalerOf(context).scale(16) > 22
+            ? 1
+            : 2;
+        final tiles = <Widget>[
+          for (final item in items)
+            Material(
+              color: colors.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(color: colors.line),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                key: ValueKey('profile.menu.${item.title}'),
+                onTap: () => Navigator.of(
+                  context,
+                ).push(MaterialPageRoute<void>(builder: (_) => item.screen)),
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: item.accent.withValues(alpha: 0.10),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Icon(
+                              item.icon,
+                              color: item.accent,
+                              size: 24,
+                            ),
+                          ),
+                          const Spacer(),
+                          Icon(
+                            Icons.arrow_outward_rounded,
+                            size: 18,
+                            color: colors.muted,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        item.title,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: colors.ink,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        item.subtitle,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodySmall?.copyWith(color: colors.muted),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ];
+        return Column(
+          children: [
+            for (var index = 0; index < tiles.length; index += columns)
+              Padding(
+                padding: EdgeInsets.only(top: index == 0 ? 0 : 12),
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var column = 0; column < columns; column++) ...[
+                        if (column > 0) const SizedBox(width: 12),
+                        Expanded(child: tiles[index + column]),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
