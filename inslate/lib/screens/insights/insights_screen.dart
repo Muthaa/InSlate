@@ -859,6 +859,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                   ),
                 ),
                 _comparison(s),
+                if (s.recordCount > 0) _trends(s),
                 UnspecifiedMovementsCard(period: s.period),
                 _purposeCategories(
                   s.expenseCategories,
@@ -866,7 +867,6 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                   expense: true,
                 ),
                 _purposeCategories(s.incomeCategories, s.totals.income),
-                if (s.recordCount > 0) _trends(s),
               ],
             ),
           ),
