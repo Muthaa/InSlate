@@ -12,6 +12,10 @@ import '../instruments/sms_balance_observations_screen.dart';
 
 class YourDataScreen extends ConsumerWidget {
   const YourDataScreen({super.key});
+  static const _deviceDataDescription =
+      'Stored locally on this device; not synchronized to an online account. '
+      'SMS storage and financial transactions are separate. Stored messages may include '
+      'failed attempts, duplicates or notifications that are not financial movements.';
   Widget _tile(
     BuildContext context,
     String title,
@@ -119,36 +123,45 @@ class YourDataScreen extends ConsumerWidget {
                 color: AppTheme.darkBlue.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(18),
               ),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.phonelink_lock_outlined,
-                        color: AppTheme.darkBlue,
-                        size: 22,
-                      ),
-                      SizedBox(width: 10),
-                      Text(
-                        'Your device. Your data.',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.darkBlue,
-                        ),
-                      ),
-                    ],
+                  const Icon(
+                    Icons.phonelink_lock_outlined,
+                    color: AppTheme.darkBlue,
+                    size: 22,
                   ),
-                  SizedBox(height: 10),
-                  Text(
-                    'Stored locally on this device; not synchronized to an online account. '
-                    'SMS storage and financial transactions are separate. Stored messages may include '
-                    'failed attempts, duplicates or notifications that are not financial movements.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.4,
-                      color: Colors.blueGrey,
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'Your device. Your data.',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.darkBlue,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'About your device data',
+                    icon: const Icon(
+                      Icons.info_outline,
+                      color: AppTheme.darkBlue,
+                    ),
+                    onPressed: () => showDialog<void>(
+                      context: context,
+                      builder: (context) => AppDialog(
+                        title: const Text('Your device. Your data.'),
+                        icon: Icons.phonelink_lock_outlined,
+                        content: const SingleChildScrollView(
+                          child: Text(_deviceDataDescription),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Close'),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -198,13 +211,8 @@ class YourDataScreen extends ConsumerWidget {
                   ),
                   _tile(
                     context,
-                    'Categories: ${s.categories}',
-                    '${s.hiddenCategories} hidden; includes built-in and custom categories.',
-                  ),
-                  _tile(
-                    context,
-                    'Categorization rules: ${s.rules}',
-                    'Manage saved automatic rules in Categories.',
+                    'Categories & rules',
+                    '${s.categories} categories (${s.hiddenCategories} hidden); ${s.rules} categorization rules. Includes built-in and custom categories. Manage saved automatic rules in Categories.',
                   ),
                   _tile(
                     context,

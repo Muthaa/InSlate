@@ -107,6 +107,31 @@ void main() {
     (tester) async {
       await open(tester, const YourDataScreen());
       expect(find.text('Financial records: 0'), findsOneWidget);
+      expect(find.text('Categories & rules'), findsOneWidget);
+      expect(find.textContaining('0 categorization rules.'), findsOneWidget);
+      expect(find.text('Categorization rules: 0'), findsNothing);
+      expect(
+        find.textContaining('Stored locally on this device;'),
+        findsNothing,
+      );
+      await tester.tap(find.byTooltip('About your device data'));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Stored locally on this device;'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining(
+          'SMS storage and financial transactions are separate.',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.widgetWithText(TextButton, 'Close'));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Stored locally on this device;'),
+        findsNothing,
+      );
       await tester.runAsync(
         () => RawMessagesRepository(db).save(
           domain.RawMessage(
@@ -198,8 +223,7 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
     for (final label in [
-      'Categories:',
-      'Categorization rules: 0',
+      'Categories & rules',
       'Registered financial instruments: 0',
     ]) {
       await tester.scrollUntilVisible(find.textContaining(label), 150);
