@@ -4,6 +4,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/design/design_tokens.dart';
 import '../../providers/app_preferences_provider.dart';
 import '../../widgets/local_avatar_button.dart';
+import '../../widgets/responsive_card_grid.dart';
 import 'profile_screen.dart';
 import 'your_data_screen.dart';
 import '../budgets/budgets_screen.dart';
@@ -156,117 +157,85 @@ class _FinanceGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = SlateColors.of(context);
     final items = [
       (
         title: 'Budgets',
         subtitle: 'Monthly expense targets',
         icon: Icons.savings_outlined,
-        accent: colors.income,
+        accent: const Color(0xFF70D9C2),
         screen: const BudgetsScreen(),
       ),
       (
         title: 'Your Data',
         subtitle: 'Review what is stored on this device',
         icon: Icons.storage_outlined,
-        accent: colors.movement,
+        accent: SlateColors.brandBlue,
         screen: const YourDataScreen(),
       ),
       (
         title: 'Categories',
         subtitle: 'Manage income and expense categories',
         icon: Icons.category_outlined,
-        accent: colors.attention,
+        accent: SlateColors.brandYellow,
         screen: const CategoriesScreen(),
       ),
       (
         title: 'Financial Instruments',
         subtitle: 'Manage your registered accounts and products',
         icon: Icons.account_balance_outlined,
-        accent: colors.movement,
+        accent: SlateColors.brandBlue,
         screen: const FinancialInstrumentsScreen(),
       ),
     ];
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns =
-            constraints.maxWidth < 340 ||
-                MediaQuery.textScalerOf(context).scale(16) > 22
-            ? 1
-            : 2;
-        final tiles = <Widget>[
-          for (final item in items)
-            Material(
-              color: colors.surface,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(color: colors.line),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                key: ValueKey('profile.menu.${item.title}'),
-                onTap: () => Navigator.of(
-                  context,
-                ).push(MaterialPageRoute<void>(builder: (_) => item.screen)),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 14,
+    final tiles = <Widget>[
+      for (final item in items)
+        Material(
+          color: AppTheme.darkBlue.withValues(alpha: 0.9),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: Colors.white12),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            key: ValueKey('profile.menu.${item.title}'),
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute<void>(builder: (_) => item.screen)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: item.accent.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(item.icon, color: item.accent, size: 20),
                   ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: item.accent.withValues(alpha: 0.10),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(item.icon, color: item.accent, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      item.title,
+                      semanticsLabel: '${item.title}. ${item.subtitle}',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          item.title,
-                          semanticsLabel: '${item.title}. ${item.subtitle}',
-                          style: Theme.of(context).textTheme.titleSmall
-                              ?.copyWith(
-                                color: colors.ink,
-                                fontWeight: FontWeight.w700,
-                              ),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        Icons.arrow_outward_rounded,
-                        size: 16,
-                        color: colors.muted,
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.arrow_outward_rounded,
+                    size: 16,
+                    color: Colors.white70,
+                  ),
+                ],
               ),
             ),
-        ];
-        return Column(
-          children: [
-            for (var index = 0; index < tiles.length; index += columns)
-              Padding(
-                padding: EdgeInsets.only(top: index == 0 ? 0 : 12),
-                child: IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      for (var column = 0; column < columns; column++) ...[
-                        if (column > 0) const SizedBox(width: 12),
-                        Expanded(child: tiles[index + column]),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        );
-      },
-    );
+          ),
+        ),
+    ];
+    return ResponsiveCardGrid(children: tiles);
   }
 }

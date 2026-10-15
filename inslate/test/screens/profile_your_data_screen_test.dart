@@ -1,4 +1,6 @@
 import 'package:drift/native.dart';
+import 'package:inslate/core/theme/app_theme.dart';
+import '../helpers/widget_capture.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -65,17 +67,74 @@ void main() {
     });
   }
 
-  Future<void> open(WidgetTester tester, Widget screen) async {
+  Future<void> open(
+    WidgetTester tester,
+    Widget screen, {
+    bool large = false,
+    bool dark = false,
+    GlobalKey? boundary,
+  }) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           databaseProvider.overrideWithValue(db),
           importProvider.overrideWith(TestImporter.new),
         ],
-        child: MaterialApp(home: screen),
+        child: RepaintBoundary(
+          key: boundary,
+          child: MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: dark ? AppTheme.dark() : AppTheme.light(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: TextScaler.linear(large ? 2 : 1)),
+              child: child!,
+            ),
+            home: screen,
+          ),
+        ),
       ),
     );
     await tester.pumpAndSettle();
+  }
+
+  for (final large in [false, true]) {
+    testUi('Your Data grid remains readable and reachable, large text $large', (
+      tester,
+    ) async {
+      tester.view.physicalSize = Size(large ? 320 : 430, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await loadCaptureFonts(tester);
+      final boundary = GlobalKey();
+      await open(
+        tester,
+        const YourDataScreen(),
+        large: large,
+        boundary: boundary,
+      );
+      final records = tester.getRect(
+        find.byKey(const ValueKey('your-data.Financial records')),
+      );
+      final sms = tester.getRect(
+        find.byKey(const ValueKey('your-data.Raw SMS messages')),
+      );
+      if (large) {
+        expect(sms.top, greaterThan(records.bottom));
+        expect(sms.left, records.left);
+      } else {
+        expect(sms.top, records.top);
+        expect(sms.left, greaterThan(records.right));
+        await captureWidget(tester, boundary, 'your-data');
+      }
+      await tester.ensureVisible(
+        find.text('Registered financial instruments: 0'),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
   }
 
   testUi(
@@ -213,10 +272,22 @@ void main() {
     tester,
   ) async {
     await open(tester, const YourDataScreen());
-    expect(find.text('Balance observations: 0'), findsNothing);
-    final tiles = tester.widgetList<ListTile>(find.byType(ListTile)).toList();
-    expect((tiles[0].title! as Text).data, 'Financial records: 0');
-    expect((tiles[1].title! as Text).data, 'SMS balance observations: 0');
+    expect(find.text('Balance observations: 0'), findsOneWidget);
+    expect(find.text('SMS balance observations: 0'), findsNothing);
+    final balances = tester.getRect(
+      find.byKey(const ValueKey('your-data.Balance observations')),
+    );
+    final records = tester.getRect(
+      find.byKey(const ValueKey('your-data.Financial records')),
+    );
+    final sms = tester.getRect(
+      find.byKey(const ValueKey('your-data.Raw SMS messages')),
+    );
+    expect(balances.bottom, lessThan(records.top));
+    expect(records.top, sms.top);
+    expect(records.right, lessThan(sms.left));
+    await tester.ensureVisible(find.text('Financial records: 0'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Financial records: 0'));
     await tester.pumpAndSettle();
     expect(find.text('Your financial timeline'), findsOneWidget);
@@ -228,18 +299,22 @@ void main() {
     ]) {
       await tester.scrollUntilVisible(find.textContaining(label), 150);
       await tester.pumpAndSettle();
-      final tile = tester.widget<ListTile>(
-        find.ancestor(
-          of: find.textContaining(label),
-          matching: find.byType(ListTile),
-        ),
+      final card = find.byKey(ValueKey('your-data.${label.split(':').first}'));
+      final tile = tester.widget<InkWell>(
+        find.descendant(of: card, matching: find.byType(InkWell)),
       );
       expect(tile.onTap, isNull);
-      expect(tile.trailing, isNull);
+      expect(
+        find.descendant(
+          of: card,
+          matching: find.byIcon(Icons.arrow_outward_rounded),
+        ),
+        findsNothing,
+      );
     }
-    await tester.ensureVisible(find.text('SMS balance observations: 0'));
+    await tester.ensureVisible(find.text('Balance observations: 0'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('SMS balance observations: 0'));
+    await tester.tap(find.text('Balance observations: 0'));
     await tester.pumpAndSettle();
     expect(find.byType(YourDataScreen, skipOffstage: false), findsOneWidget);
     expect(find.text('0 SMS observations'), findsOneWidget);

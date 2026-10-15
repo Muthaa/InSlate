@@ -6,15 +6,15 @@ The rocket (`LocalAvatar.astronaut`, the existing stored enum value) is the defa
 
 The four destinations under **Manage your finances** use a two-column grid with equal-height cards in each row. The grid switches to one column below 340 logical pixels of available width or when a 16-point font scales above 22 points. Content determines card height, and the page scrolls normally. Destinations and their behavior remain the same.
 
-Cards use a compact horizontal layout with the icon, wrapping title and arrow on the same row. Descriptions remain available to assistive technologies without adding visible height. Cards use the shared semantic surface, border, text and muted-text tokens, with rounded corners and restrained teal, blue and yellow icon backgrounds. Light and dark themes retain readable headings and surfaces. The avatar picker uses its actual sheet constraints, scrolls when needed, and respects device safe areas.
+Cards use a compact horizontal layout with the icon, wrapping title and arrow on the same row. Descriptions remain available to assistive technologies without adding visible height. Menu cards match the navy user-area surface, with white labels and restrained mint, blue and yellow icon accents. Light and dark themes retain readable headings and surfaces. The avatar picker uses its actual sheet constraints, scrolls when needed, and respects device safe areas.
 
 ## Review captures
 
 These are rendered Flutter widget captures with real Roboto and Material icon fonts. Dashboard records are synthetic. Captures omit system navigation; the production inset tests cover the app and phone navigation boundaries.
 
 - [Dashboard with rocket shortcut](v2-captures/profile/home.png)
-- [Profile light](v2-captures/profile/profile-light.png)
-- [Profile dark](v2-captures/profile/profile-dark.png)
+- [Profile light](v2-captures/grids/profile-light.png)
+- [Profile dark](v2-captures/grids/profile-dark.png)
 - [Previous Dashboard shortcut](v2-captures/restored/home.png)
 
 ## Verification

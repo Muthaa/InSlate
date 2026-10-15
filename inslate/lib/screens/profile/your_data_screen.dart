@@ -1,5 +1,6 @@
 import 'verified_reversals_section.dart';
 import '../../widgets/app_dialog.dart';
+import '../../widgets/responsive_card_grid.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
@@ -33,52 +34,63 @@ class YourDataScreen extends ConsumerWidget {
         : title.startsWith('Registered')
         ? Icons.account_balance_outlined
         : Icons.account_balance_wallet_outlined;
-    return Card(
-      color: Colors.white,
-      surfaceTintColor: Colors.transparent,
-      margin: const EdgeInsets.only(bottom: 10),
+    return Material(
+      key: ValueKey('your-data.${title.split(':').first}'),
+      color: const Color(0xFFE7EEF5),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 10,
-        ),
-        leading: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: AppTheme.appBackground,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, size: 22, color: AppTheme.teal),
-        ),
-        title: Text(
-          title,
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: AppTheme.darkBlue,
-          ),
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Text(
-            detail,
-            style: TextStyle(
-              fontSize: 12,
-              height: 1.4,
-              color: Colors.grey.shade600,
-            ),
-          ),
-        ),
-        trailing: target == null
-            ? null
-            : const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
         onTap: target == null
             ? null
             : () => Navigator.push(
                 context,
                 MaterialPageRoute<void>(builder: (_) => target),
               ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.darkBlue.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, size: 20, color: AppTheme.darkBlue),
+                  ),
+                  const Spacer(),
+                  if (target != null)
+                    const Icon(
+                      Icons.arrow_outward_rounded,
+                      size: 18,
+                      color: AppTheme.darkBlue,
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.darkBlue,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                detail,
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.4,
+                  color: Color(0xFF465C73),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -193,31 +205,36 @@ class YourDataScreen extends ConsumerWidget {
                 children: [
                   _tile(
                     context,
-                    'Financial records: ${s.records}',
-                    '${s.successfulRecords} marked successful. Browse stored records by period in Activity.',
-                    const ActivityScreen(),
-                  ),
-                  _tile(
-                    context,
-                    'SMS balance observations: ${s.smsBalances}',
-                    '${s.unattributedSmsBalances} unattributed. Review associations and historical extraction.',
+                    'Balance observations: ${s.smsBalances}',
+                    'Latest recorded wallet balances and SMS history.',
                     const SmsBalanceObservationsScreen(unattributedOnly: false),
                   ),
-                  _tile(
-                    context,
-                    'Raw SMS messages: ${s.messages}',
-                    'Source messages stored for parsing and provenance. Review receipt times without exposing bodies or identifiers.',
-                    const StoredSmsScreen(),
-                  ),
-                  _tile(
-                    context,
-                    'Categories & rules',
-                    '${s.categories} categories (${s.hiddenCategories} hidden); ${s.rules} categorization rules. Includes built-in and custom categories. Manage saved automatic rules in Categories.',
-                  ),
-                  _tile(
-                    context,
-                    'Registered financial instruments: ${s.activeInstruments + s.archivedInstruments}',
-                    '${s.activeInstruments} active; ${s.archivedInstruments} archived. Legacy unconfirmed accounts are excluded.',
+                  const SizedBox(height: 12),
+                  ResponsiveCardGrid(
+                    children: [
+                      _tile(
+                        context,
+                        'Financial records: ${s.records}',
+                        '${s.successfulRecords} successful. View stored records in Activity.',
+                        const ActivityScreen(),
+                      ),
+                      _tile(
+                        context,
+                        'Raw SMS messages: ${s.messages}',
+                        'Stored source messages. Review receipt times.',
+                        const StoredSmsScreen(),
+                      ),
+                      _tile(
+                        context,
+                        'Categories & rules',
+                        '${s.categories} categories (${s.hiddenCategories} hidden); ${s.rules} categorization rules.',
+                      ),
+                      _tile(
+                        context,
+                        'Registered financial instruments: ${s.activeInstruments + s.archivedInstruments}',
+                        '${s.activeInstruments} active; ${s.archivedInstruments} archived. Registered instruments only.',
+                      ),
+                    ],
                   ),
                 ],
               ),
