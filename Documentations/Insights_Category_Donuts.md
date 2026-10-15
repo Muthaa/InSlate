@@ -13,3 +13,24 @@ The chart uses Flutter CustomPainter without a new dependency or animation. The 
 - [Insights screen](v2-captures/donuts/insights-categories.png)
 
 17 focused donut and Insights widget tests pass, including segment hit testing, exact category filters, legend navigation, hidden/zero categories, negative adjustments, mismatched totals, empty states and narrow screens with doubled text. Analyzer, formatting and whitespace checks pass.
+
+## Purpose-based color identity
+
+Donut segments and legend icons now share a centralized `CategoryVisual` keyed by the permanent category ID, rather than the current list position. Period changes, spending-rank changes, renaming and hiding preserve the category's visual identity. Each built-in purpose has a distinct color within its income/expense group and a recognizable icon.
+
+| Expense purpose | Color family | Income purpose | Color family |
+| --- | --- | --- | --- |
+| Food & groceries | Amber | Salary | Teal |
+| Transport | Blue | Business income | Blue |
+| Housing | Indigo | Freelance income | Violet |
+| Bills & utilities | Cyan | Gifts & support | Gold |
+| Health | Rose | Refunds | Green |
+| Education | Violet | Other income | Slate |
+| Shopping | Plum | | |
+| Leisure | Burnt orange | | |
+| Family & support | Green | | |
+| Other expenses | Slate | | |
+
+Uncategorized entries use neutral gray and a question-mark icon. Custom expense categories use stable warm hues; custom income categories use stable green/blue/violet hues, derived from their IDs with contrast adjustment. Category colors identify purpose rather than financial desirability; amount colors continue to express income/expense meaning. Labels, icons, amounts and percentages keep the chart usable without relying on color alone.
+
+21 focused color/donut/Insights checks pass. They verify distinct built-in colors, graphic contrast, custom icon-surface contrast, unchanged identities after reordering/renaming/hiding, drill-downs and signed/zero-value handling. Analyzer, formatting and whitespace checks pass. Rendered captures above are refreshed with actual built-in category IDs and synthetic amounts.

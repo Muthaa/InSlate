@@ -14,9 +14,10 @@ void main() {
     double amount, {
     bool expense = true,
     bool hidden = false,
+    String? name,
   }) => InsightCategory(
     id: id,
-    name: id,
+    name: name ?? id,
     hidden: hidden,
     amount: amount,
     count: 1,
@@ -68,6 +69,54 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets(
+    'category colors and icons survive amount reordering, renaming and hiding',
+    (tester) async {
+      const food = 'builtin.expense.food';
+      const custom = 'custom-permanent-id';
+      Color? color(String id) => tester
+          .widget<Icon>(
+            find
+                .descendant(
+                  of: find.byKey(ValueKey('insights.category.expenses.$id')),
+                  matching: find.byType(Icon),
+                )
+                .first,
+          )
+          .color;
+      IconData? icon(String id) => tester
+          .widget<Icon>(
+            find
+                .descendant(
+                  of: find.byKey(ValueKey('insights.category.expenses.$id')),
+                  matching: find.byType(Icon),
+                )
+                .first,
+          )
+          .icon;
+      await open(
+        tester,
+        [group(food, 75, name: 'Food'), group(custom, 25, name: 'Custom')],
+        100,
+        (_) {},
+      );
+      final before = {food: color(food), custom: color(custom)};
+      expect(icon(food), Icons.restaurant_outlined);
+      expect(before[food], isNot(before[custom]));
+      await open(
+        tester,
+        [
+          group(custom, 90, name: 'Renamed custom', hidden: true),
+          group(food, 10, name: 'Groceries'),
+        ],
+        100,
+        (_) {},
+      );
+      expect(color(food), before[food]);
+      expect(color(custom), before[custom]);
+      expect(find.text('Renamed custom (hidden)'), findsOneWidget);
+    },
+  );
   testWidgets(
     'donut segments and matching legend open their exact category filters',
     (tester) async {
@@ -190,15 +239,30 @@ void main() {
       final boundary = GlobalKey();
       final groups = expense
           ? [
-              group('Food & groceries', 3500),
-              group('Transport', 2500),
-              group('Shopping', 1500),
-              group('Other spending', 2500),
+              group('builtin.expense.food', 3500, name: 'Food & groceries'),
+              group('builtin.expense.transport', 2500, name: 'Transport'),
+              group('builtin.expense.shopping', 1500, name: 'Shopping'),
+              group('builtin.expense.other', 2500, name: 'Other spending'),
             ]
           : [
-              group('Salary', 7500, expense: false),
-              group('Freelance', 2000, expense: false),
-              group('Other income', 500, expense: false),
+              group(
+                'builtin.income.salary',
+                7500,
+                expense: false,
+                name: 'Salary',
+              ),
+              group(
+                'builtin.income.freelance',
+                2000,
+                expense: false,
+                name: 'Freelance',
+              ),
+              group(
+                'builtin.income.other',
+                500,
+                expense: false,
+                name: 'Other income',
+              ),
             ];
       await open(
         tester,

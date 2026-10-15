@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../core/presentation/financial_presentation.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/presentation/category_visuals.dart';
+import '../../models/transaction_category.dart';
 import '../../models/activity_filter.dart';
 import '../../models/insights.dart';
 
@@ -19,20 +21,6 @@ class InsightCategoryDonut extends StatelessWidget {
     required this.onOpen,
     this.expense = false,
   });
-
-  static const _palette = [
-    Color(0xFF2876A8),
-    Color(0xFF087568),
-    Color(0xFF8E6423),
-    Color(0xFF8553A6),
-    Color(0xFFB33D45),
-    Color(0xFF526F31),
-    Color(0xFF337C87),
-    Color(0xFF445E89),
-  ];
-  Color _color(int index) => index < _palette.length
-      ? _palette[index]
-      : HSLColor.fromAHSL(1, (index * 137.508) % 360, 0.55, 0.36).toColor();
 
   @override
   Widget build(BuildContext context) {
@@ -55,7 +43,14 @@ class InsightCategoryDonut extends StatelessWidget {
         sum > 0 &&
         nonnegative &&
         (sum - total).abs() <= math.max(1e-8, total.abs() * 1e-9);
-    final colors = [for (var i = 0; i < groups.length; i++) _color(i)];
+    final visuals = [
+      for (final group in groups)
+        CategoryVisual.forCategory(
+          group.id,
+          expense ? CategoryKind.expense : CategoryKind.income,
+        ),
+    ];
+    final colors = [for (final visual in visuals) visual.color];
     final shares = [
       for (final group in groups) available ? group.amount / sum : 0.0,
     ];
@@ -161,7 +156,7 @@ class InsightCategoryDonut extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         for (var index = 0; index < groups.length; index++)
-          _legend(context, groups[index], colors[index], accent),
+          _legend(context, groups[index], visuals[index], accent),
       ],
     );
   }
@@ -169,7 +164,7 @@ class InsightCategoryDonut extends StatelessWidget {
   Widget _legend(
     BuildContext context,
     InsightCategory group,
-    Color color,
+    CategoryVisual visual,
     Color accent,
   ) {
     final share = group.share(total);
@@ -187,9 +182,13 @@ class InsightCategoryDonut extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                color: visual.color.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(visual.icon, size: 17, color: visual.color),
             ),
             const SizedBox(width: 10),
             Expanded(
