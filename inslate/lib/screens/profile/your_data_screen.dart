@@ -186,6 +186,12 @@ class YourDataScreen extends ConsumerWidget {
                   ),
                   _tile(
                     context,
+                    'SMS balance observations: ${s.smsBalances}',
+                    '${s.unattributedSmsBalances} unattributed. Review associations and historical extraction.',
+                    const SmsBalanceObservationsScreen(unattributedOnly: false),
+                  ),
+                  _tile(
+                    context,
                     'Raw SMS messages: ${s.messages}',
                     'Source messages stored for parsing and provenance. Review receipt times without exposing bodies or identifiers.',
                     const StoredSmsScreen(),
@@ -204,17 +210,6 @@ class YourDataScreen extends ConsumerWidget {
                     context,
                     'Registered financial instruments: ${s.activeInstruments + s.archivedInstruments}',
                     '${s.activeInstruments} active; ${s.archivedInstruments} archived. Legacy unconfirmed accounts are excluded.',
-                  ),
-                  _tile(
-                    context,
-                    'Balance observations: ${s.balances}',
-                    '${s.manualBalances} manual; ${s.smsBalances} SMS-reported. Manage manual observations in Instrument Details.',
-                  ),
-                  _tile(
-                    context,
-                    'SMS balance observations: ${s.smsBalances}',
-                    '${s.unattributedSmsBalances} unattributed. Review associations and historical extraction.',
-                    const SmsBalanceObservationsScreen(unattributedOnly: false),
                   ),
                 ],
               ),

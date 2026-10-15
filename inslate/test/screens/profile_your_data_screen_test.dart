@@ -188,6 +188,10 @@ void main() {
     tester,
   ) async {
     await open(tester, const YourDataScreen());
+    expect(find.text('Balance observations: 0'), findsNothing);
+    final tiles = tester.widgetList<ListTile>(find.byType(ListTile)).toList();
+    expect((tiles[0].title! as Text).data, 'Financial records: 0');
+    expect((tiles[1].title! as Text).data, 'SMS balance observations: 0');
     await tester.tap(find.text('Financial records: 0'));
     await tester.pumpAndSettle();
     expect(find.text('Your financial timeline'), findsOneWidget);
@@ -197,20 +201,20 @@ void main() {
       'Categories:',
       'Categorization rules: 0',
       'Registered financial instruments: 0',
-      'Balance observations: 0',
     ]) {
       await tester.scrollUntilVisible(find.textContaining(label), 150);
       await tester.pumpAndSettle();
       final tile = tester.widget<ListTile>(
-        find.ancestor(of: find.textContaining(label), matching: find.byType(ListTile)),
+        find.ancestor(
+          of: find.textContaining(label),
+          matching: find.byType(ListTile),
+        ),
       );
       expect(tile.onTap, isNull);
       expect(tile.trailing, isNull);
     }
-    await tester.scrollUntilVisible(
-      find.text('SMS balance observations: 0'),
-      200,
-    );
+    await tester.ensureVisible(find.text('SMS balance observations: 0'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('SMS balance observations: 0'));
     await tester.pumpAndSettle();
     expect(find.byType(YourDataScreen, skipOffstage: false), findsOneWidget);
