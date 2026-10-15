@@ -124,11 +124,17 @@ void main() {
         type: InstrumentType.mobileWallet,
         provider: 'M-PESA',
       );
-      await repo.associateSms(
-        id: 'sms:mpesa-wallet:existing',
-        expectedAccountId: null,
-        expectedRevision: 0,
-        accountId: instrument.id,
+      // Existing installations may have a legacy M-PESA link. Re-extraction
+      // must preserve it even though new measured-wallet links are blocked.
+      await (db.update(
+        db.balanceEvidence,
+      )..where((e) => e.id.equals('sms:mpesa-wallet:existing'))).write(
+        BalanceEvidenceCompanion(
+          accountId: Value(instrument.id),
+          associationOrigin: const Value('explicit_user'),
+          associatedMillis: Value(date.millisecondsSinceEpoch),
+          revision: const Value(1),
+        ),
       );
       await repo.createManual(
         accountId: instrument.id,

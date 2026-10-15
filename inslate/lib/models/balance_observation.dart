@@ -114,6 +114,16 @@ class BalanceObservation {
       '${SnapshotMoney.decimal(amountMinor, currency)} $currency';
 }
 
+/// A presentation summary; source observations remain unchanged.
+class SmsWalletBalance {
+  final BalanceObservation latest;
+  final int observationCount;
+  const SmsWalletBalance(this.latest, this.observationCount);
+  bool get isMeasuredWallet => latest.subjectFamily == AccountType.mpesa;
+  String get key =>
+      '${latest.subjectFamily?.name ?? 'unknown'}:${latest.currency}';
+}
+
 class BalanceHistoryPage {
   final List<BalanceObservation> entries;
   final int count, page;

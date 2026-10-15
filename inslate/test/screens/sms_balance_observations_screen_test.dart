@@ -51,8 +51,8 @@ void main() {
     instruments = FinancialInstrumentsRepository(db);
     wallet = await instruments.create(
       name: 'My wallet',
-      type: InstrumentType.mobileWallet,
-      provider: 'MPESA',
+      type: InstrumentType.savingsProduct,
+      provider: 'M-Shwari',
     );
   });
   void testUi(String name, Future<void> Function(WidgetTester) body) {
@@ -77,17 +77,17 @@ void main() {
       domain.RawMessage(
         id: id,
         sender: 'MPESA',
-        body: 'New M-PESA balance is Ksh0.00.',
+        body: 'New M-Shwari balance is Ksh0.00.',
         receivedAt: asOf ?? date,
       ),
     );
     await repo.extractNewMpesaMessages([id]);
-    return 'sms:mpesa-wallet:$id';
+    return 'sms:mshwari-savings:$id';
   }
 
   Future<void> open(
     WidgetTester tester, {
-    Widget home = const SmsBalanceObservationsScreen(),
+    Widget home = const SmsBalanceHistoryScreen(unattributedOnly: true),
   }) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -139,10 +139,7 @@ void main() {
       await open(tester, home: const FinancialInstrumentsScreen());
       await tap(tester, find.text('Review SMS balance observations'));
       expect(find.text('SMS balance observations'), findsOneWidget);
-      expect(
-        find.text('No unattributed SMS balance observations.'),
-        findsOneWidget,
-      );
+      expect(find.text('No SMS balance observations.'), findsOneWidget);
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(find.text('Financial Instruments'), findsOneWidget);
@@ -153,7 +150,7 @@ void main() {
     (tester) async {
       final id = await sms('one');
       await open(tester);
-      expect(find.text('M-PESA wallet'), findsOneWidget);
+      expect(find.text('M-Shwari savings'), findsOneWidget);
       expect(find.text('0.00 KES'), findsOneWidget);
       expect(find.text('SMS-reported'), findsOneWidget);
       expect(
@@ -190,12 +187,12 @@ void main() {
       await link(id);
       await instruments.create(
         name: 'Second wallet',
-        type: InstrumentType.mobileWallet,
-        provider: 'MPESA',
+        type: InstrumentType.savingsProduct,
+        provider: 'M-Shwari',
       );
       await open(
         tester,
-        home: const SmsBalanceObservationsScreen(unattributedOnly: false),
+        home: const SmsBalanceHistoryScreen(unattributedOnly: false),
       );
       await tap(tester, find.byKey(ValueKey('sms.associate.$id')));
       await choose(tester, 'Second wallet');
@@ -227,7 +224,7 @@ void main() {
       final id = await sms('compatibility');
       await instruments.create(
         name: 'Unnamed provider',
-        type: InstrumentType.mobileWallet,
+        type: InstrumentType.savingsProduct,
       );
       await instruments.create(
         name: 'Insurance',
@@ -278,7 +275,7 @@ void main() {
           );
       await open(
         tester,
-        home: const SmsBalanceObservationsScreen(unattributedOnly: false),
+        home: const SmsBalanceHistoryScreen(unattributedOnly: false),
       );
       expect(find.text('Instrument: My wallet (Archived)'), findsOneWidget);
       await tap(tester, find.byKey(ValueKey('sms.associate.$id')));
@@ -324,7 +321,7 @@ void main() {
     expect(find.text('SMS page 2 of 2'), findsOneWidget);
     await tap(
       tester,
-      find.byKey(const ValueKey('sms.associate.sms:mpesa-wallet:page-0')),
+      find.byKey(const ValueKey('sms.associate.sms:mshwari-savings:page-0')),
     );
     await choose(tester, 'My wallet');
     await tap(tester, find.widgetWithText(FilledButton, 'Confirm association'));

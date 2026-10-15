@@ -25,14 +25,14 @@ void main() {
     instruments = FinancialInstrumentsRepository(db);
     wallet = await instruments.create(
       name: 'My wallet',
-      type: InstrumentType.mobileWallet,
-      provider: 'M-PESA',
+      type: InstrumentType.savingsProduct,
+      provider: 'M-Shwari',
     );
   });
   tearDown(() => db.close());
   Future<StoredBalanceEvidence> sms(
     String id, {
-    String body = 'New M-PESA balance is Ksh0.00.',
+    String body = 'New M-Shwari balance is Ksh0.00.',
     DateTime? asOf,
   }) async {
     await RawMessagesRepository(db).save(
@@ -65,6 +65,17 @@ void main() {
     confirmReplacement: replace,
     confirmUncertainCompatibility: uncertain,
   );
+  test('M-PESA measured wallet cannot be attributed', () async {
+    final e = await sms('measured', body: 'New M-PESA balance is Ksh5.00.');
+    final target = await instruments.create(
+      name: 'M-PESA',
+      type: InstrumentType.mobileWallet,
+      provider: 'MPESA',
+    );
+    await expectLater(link(e, target.id), throwsArgumentError);
+    expect((await row(e.id)).accountId, isNull);
+    expect((await row(e.id)).amountMinor, 500);
+  });
   test(
     'explicit link stores numeric ID and provenance and preserves source content',
     () async {
@@ -155,8 +166,8 @@ void main() {
       final e = await sms('replace');
       final other = await instruments.create(
         name: 'Second',
-        type: InstrumentType.mobileWallet,
-        provider: 'MPESA',
+        type: InstrumentType.savingsProduct,
+        provider: 'M-Shwari',
       );
       await link(e, wallet.id);
       final linked = await row(e.id);
@@ -205,8 +216,8 @@ void main() {
     final e = await sms('race');
     final other = await instruments.create(
       name: 'Other',
-      type: InstrumentType.mobileWallet,
-      provider: 'MPESA',
+      type: InstrumentType.savingsProduct,
+      provider: 'M-Shwari',
     );
     Future<bool> attempt(int target) async {
       try {
@@ -226,12 +237,12 @@ void main() {
     () async {
       final e = await sms('types');
       for (final type in InstrumentType.values.where(
-        (t) => t != InstrumentType.mobileWallet && t != InstrumentType.other,
+        (t) => t != InstrumentType.savingsProduct && t != InstrumentType.other,
       )) {
         final instrument = await instruments.create(
           name: type.name,
           type: type,
-          provider: 'M-PESA',
+          provider: 'M-Shwari',
         );
         await expectLater(
           link(e, instrument.id, uncertain: true),
@@ -246,8 +257,8 @@ void main() {
       final e = await sms('provider');
       final wrong = await instruments.create(
         name: 'Wrong provider',
-        type: InstrumentType.mobileWallet,
-        provider: 'M-Shwari',
+        type: InstrumentType.savingsProduct,
+        provider: 'KCB M-PESA',
       );
       await expectLater(
         link(e, wrong.id, uncertain: true),
@@ -262,7 +273,7 @@ void main() {
         final e = await sms('unknown-${provider ?? 'none'}');
         final instrument = await instruments.create(
           name: 'Declared',
-          type: InstrumentType.mobileWallet,
+          type: InstrumentType.savingsProduct,
           provider: provider,
         );
         await expectLater(link(e, instrument.id), throwsArgumentError);
@@ -295,8 +306,12 @@ void main() {
       '${entry.key} uses independently typed subject compatibility',
       () async {
         final e = await sms(entry.key, body: entry.value.$1);
+        final incompatible = await instruments.create(
+          name: 'Insurance',
+          type: InstrumentType.insurancePolicy,
+        );
         await expectLater(
-          link(e, wallet.id, uncertain: true),
+          link(e, incompatible.id, uncertain: true),
           throwsArgumentError,
         );
         final instrument = await instruments.create(

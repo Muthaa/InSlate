@@ -181,6 +181,11 @@ class BalanceEvidenceRepository {
         'Association changed. Reload the observation and try again.',
       );
     }
+    if (accountId != null && row.subjectFamily == AccountType.mpesa.name) {
+      throw ArgumentError(
+        'M-PESA is the measured wallet and cannot be attributed to an instrument.',
+      );
+    }
     if (row.accountId == accountId) return;
     if (accountId != null) {
       if (row.accountId != null && !confirmReplacement) {
@@ -222,12 +227,18 @@ class BalanceEvidenceRepository {
   Future<BalanceHistoryPage> smsHistory({
     bool unattributedOnly = true,
     int page = 0,
+    AccountType? subjectFamily,
+    String? currency,
   }) => database.transaction(() async {
     if (page < 0) throw ArgumentError('Invalid evidence page.');
     final t = database.balanceEvidence;
     final predicate =
         t.origin.equals('sms_reported') &
-        (unattributedOnly ? t.accountId.isNull() : const Constant(true));
+        (unattributedOnly ? t.accountId.isNull() : const Constant(true)) &
+        (subjectFamily == null
+            ? const Constant(true)
+            : t.subjectFamily.equals(subjectFamily.name)) &
+        (currency == null ? const Constant(true) : t.currency.equals(currency));
     final countExpr = t.id.count();
     final count =
         (await (database.selectOnly(t)
@@ -265,6 +276,63 @@ class BalanceEvidenceRepository {
       count,
       actual,
     );
+  });
+
+  Future<List<SmsWalletBalance>> smsWallets() => database.transaction(() async {
+    final t = database.balanceEvidence;
+    final count = t.id.count();
+    final groups =
+        await (database.selectOnly(t)
+              ..addColumns([t.subjectFamily, t.currency, count])
+              ..where(t.origin.equals('sms_reported'))
+              ..groupBy([t.subjectFamily, t.currency]))
+            .get();
+    final result = <SmsWalletBalance>[];
+    final a = database.accounts;
+    for (final group in groups) {
+      final family = group.read(t.subjectFamily);
+      final currency = group.read(t.currency)!;
+      final rows =
+          await (database.select(t).join([
+                  leftOuterJoin(
+                    a,
+                    a.id.equalsExp(t.accountId) &
+                        a.isUserRegistered.equals(true),
+                  ),
+                ])
+                ..where(
+                  t.origin.equals('sms_reported') &
+                      t.currency.equals(currency) &
+                      (family == null
+                          ? t.subjectFamily.isNull()
+                          : t.subjectFamily.equals(family)),
+                )
+                ..orderBy([
+                  OrderingTerm.desc(t.asOfMillis),
+                  OrderingTerm.desc(t.createdMillis),
+                  OrderingTerm.desc(t.id),
+                ])
+                ..limit(1))
+              .get();
+      final row = rows.single;
+      result.add(
+        SmsWalletBalance(
+          _map(
+            row.readTable(t),
+            associationName: row.readTableOrNull(a)?.name,
+            associationArchived: row.readTableOrNull(a)?.isActive == false,
+          ),
+          group.read(count)!,
+        ),
+      );
+    }
+    result.sort((a, b) {
+      if (a.isMeasuredWallet != b.isMeasuredWallet) {
+        return a.isMeasuredWallet ? -1 : 1;
+      }
+      return a.key.compareTo(b.key);
+    });
+    return result;
   });
 
   Future<void> _registered(int id) async {
