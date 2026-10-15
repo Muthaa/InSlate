@@ -24,6 +24,20 @@ class AppPreferences {
     }
   }
 
+  bool get reduceMotion => _preferences.getBool('reduce_motion') ?? false;
+  Future<void> setReduceMotion(bool enabled) async {
+    if (!await _preferences.setBool('reduce_motion', enabled)) {
+      throw StateError('Unable to save appearance preference.');
+    }
+  }
+
+  bool get appLockEnabled => _preferences.getBool('app_lock_enabled') ?? false;
+  Future<void> setAppLockEnabled(bool enabled) async {
+    if (!await _preferences.setBool('app_lock_enabled', enabled)) {
+      throw StateError('Unable to save app lock preference.');
+    }
+  }
+
   String? get localDisplayName => _preferences.getString('local_display_name');
 
   Future<void> setLocalDisplayName(String value) async {

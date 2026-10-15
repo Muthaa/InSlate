@@ -19,11 +19,11 @@ Captures use synthetic records and actual Flutter rendering. 53 focused Home, In
 
 ## Suggested future Profile settings
 
-These are recommendations, not added menu destinations:
+These recommendations are now implemented as described in [Profile settings and app lock](Profile_Settings_and_App_Lock.md); Backup & restore remains a future feature:
 
 - **Appearance**: system/light/dark theme and display preferences.
 - **Privacy & security**: hide amounts and optional device-authenticated app lock.
 - **Backup & restore**: local export, backup and validated restore, consistent with the offline identity.
 - **Help & about**: app version, financial definitions and troubleshooting.
 
-Each should be introduced with working destinations and its own scoped implementation.
+Appearance currently implements motion preferences; an app-wide theme selector remains outside this milestone.

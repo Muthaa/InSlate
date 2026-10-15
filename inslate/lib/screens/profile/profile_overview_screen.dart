@@ -7,6 +7,7 @@ import '../../widgets/local_avatar_button.dart';
 import '../../widgets/responsive_card_grid.dart';
 import 'profile_screen.dart';
 import 'your_data_screen.dart';
+import 'settings_screen.dart';
 import '../budgets/budgets_screen.dart';
 import '../categories/categories_screen.dart';
 import '../instruments/financial_instruments_screen.dart';
@@ -147,46 +148,82 @@ class ProfileOverviewScreen extends ConsumerWidget {
           ),
         ),
         const _FinanceGrid(),
+        const SizedBox(height: 24),
+        Text('Settings', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 12),
+        const _FinanceGrid(settings: true),
       ],
     ),
   );
 }
 
 class _FinanceGrid extends StatelessWidget {
-  const _FinanceGrid();
+  final bool settings;
+  const _FinanceGrid({this.settings = false});
 
   @override
   Widget build(BuildContext context) {
-    final items = [
-      (
-        title: 'Budgets',
-        subtitle: 'Monthly expense targets',
-        icon: Icons.savings_outlined,
-        accent: const Color(0xFF70D9C2),
-        screen: const BudgetsScreen(),
-      ),
-      (
-        title: 'Your Data',
-        subtitle: 'Review what is stored on this device',
-        icon: Icons.storage_outlined,
-        accent: SlateColors.brandBlue,
-        screen: const YourDataScreen(),
-      ),
-      (
-        title: 'Categories',
-        subtitle: 'Manage income and expense categories',
-        icon: Icons.category_outlined,
-        accent: SlateColors.brandYellow,
-        screen: const CategoriesScreen(),
-      ),
-      (
-        title: 'Financial Instruments',
-        subtitle: 'Manage your registered accounts and products',
-        icon: Icons.account_balance_outlined,
-        accent: SlateColors.brandBlue,
-        screen: const FinancialInstrumentsScreen(),
-      ),
-    ];
+    final items = settings
+        ? [
+            (
+              title: 'Appearance',
+              subtitle: 'Motion and display preferences',
+              icon: Icons.palette_outlined,
+              accent: SlateColors.brandBlue,
+              screen: const SettingsScreen(setting: ProfileSetting.appearance),
+            ),
+            (
+              title: 'Privacy & app lock',
+              subtitle: 'Protect InSlate with your device screen lock',
+              icon: Icons.lock_outline_rounded,
+              accent: const Color(0xFF70D9C2),
+              screen: const SettingsScreen(setting: ProfileSetting.privacy),
+            ),
+            (
+              title: 'Backup & restore',
+              subtitle: 'Future implementation',
+              icon: Icons.backup_outlined,
+              accent: SlateColors.brandYellow,
+              screen: const SettingsScreen(setting: ProfileSetting.backup),
+            ),
+            (
+              title: 'Help & about',
+              subtitle: 'Financial definitions, help and licenses',
+              icon: Icons.help_outline_rounded,
+              accent: SlateColors.brandBlue,
+              screen: const SettingsScreen(setting: ProfileSetting.help),
+            ),
+          ]
+        : [
+            (
+              title: 'Budgets',
+              subtitle: 'Monthly expense targets',
+              icon: Icons.savings_outlined,
+              accent: const Color(0xFF70D9C2),
+              screen: const BudgetsScreen(),
+            ),
+            (
+              title: 'Your Data',
+              subtitle: 'Review what is stored on this device',
+              icon: Icons.storage_outlined,
+              accent: SlateColors.brandBlue,
+              screen: const YourDataScreen(),
+            ),
+            (
+              title: 'Categories',
+              subtitle: 'Manage income and expense categories',
+              icon: Icons.category_outlined,
+              accent: SlateColors.brandYellow,
+              screen: const CategoriesScreen(),
+            ),
+            (
+              title: 'Financial Instruments',
+              subtitle: 'Manage your registered accounts and products',
+              icon: Icons.account_balance_outlined,
+              accent: SlateColors.brandBlue,
+              screen: const FinancialInstrumentsScreen(),
+            ),
+          ];
     final tiles = <Widget>[
       for (final item in items)
         Material(
@@ -215,13 +252,28 @@ class _FinanceGrid extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      item.title,
-                      semanticsLabel: '${item.title}. ${item.subtitle}',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.title,
+                          semanticsLabel: '${item.title}. ${item.subtitle}',
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                        if (item.title == 'Backup & restore')
+                          const Text(
+                            'Future implementation',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.white70,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                   const SizedBox(width: 4),

@@ -390,21 +390,6 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
         compact: true,
         icon: expense ? Icons.remove_circle_outline : Icons.add_circle_outline,
         accent: accent,
-        action: SizedBox(
-          width: 96,
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerRight,
-            child: Text(
-              formatMoney(total),
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: accent,
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -885,13 +870,16 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                 ),
                 _comparison(s),
                 if (s.recordCount > 0) _trends(s),
-                UnspecifiedMovementsCard(period: s.period),
                 _purposeCategories(
                   s.expenseCategories,
                   s.totals.expenses,
                   expense: true,
                 ),
                 _purposeCategories(s.incomeCategories, s.totals.income),
+                Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: UnspecifiedMovementsCard(period: s.period),
+                ),
               ],
             ),
           ),

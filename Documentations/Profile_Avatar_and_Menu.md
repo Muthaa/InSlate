@@ -13,8 +13,8 @@ Cards use a compact horizontal layout with the icon, wrapping title and arrow on
 These are rendered Flutter widget captures with real Roboto and Material icon fonts. Dashboard records are synthetic. Captures omit system navigation; the production inset tests cover the app and phone navigation boundaries.
 
 - [Dashboard with rocket shortcut](v2-captures/profile/home.png)
-- [Profile light](v2-captures/grids/profile-light.png)
-- [Profile dark](v2-captures/grids/profile-dark.png)
+- [Profile light](v2-captures/settings/profile-light.png)
+- [Profile dark](v2-captures/settings/profile-dark.png)
 - [Previous Dashboard shortcut](v2-captures/restored/home.png)
 
 ## Verification
@@ -22,3 +22,5 @@ These are rendered Flutter widget captures with real Roboto and Material icon fo
 70 focused tests pass across Dashboard, Profile/Your Data, avatar preferences and selection, AppShell, device/navigation insets and responsive Profile grid checks. After compacting the cards, changing the Dashboard avatar to white and matching the bottom navigation to the navy app bar, all 25 related grid, AppShell, navigation and capture tests pass again. Application code and the changed/new tests analyze cleanly; changed Dart files pass formatting and whitespace checks.
 
 The avatar-selection test now scrolls its target into view before tapping; its earlier failure came from an offscreen target. Checks cover rocket defaults, preservation of explicit selections, live Dashboard updates, Profile-tab reuse, light/dark surfaces and doubled text size. Physical Android testing and the full test suite were not run.
+
+Profile also includes the [Settings grid and Android app lock](Profile_Settings_and_App_Lock.md).

@@ -134,6 +134,38 @@ void main() {
       await tester.ensureVisible(find.text('Expense purpose categories'));
       await tester.pumpAndSettle();
       if (!large) await captureWidget(tester, boundary, 'insights-categories');
+      final expensesCard = find
+          .ancestor(
+            of: find.text('Expense purpose categories'),
+            matching: find.byType(Card),
+          )
+          .first;
+      final incomeCard = find
+          .ancestor(
+            of: find.text('Income purpose categories'),
+            matching: find.byType(Card),
+          )
+          .first;
+      final purpose = find.text('Purpose unspecified');
+      expect(
+        tester.getRect(purpose).top,
+        greaterThan(tester.getRect(incomeCard).bottom),
+      );
+      // Amounts remain in category rows, with no duplicate total in headings.
+      final expenseHeader = find
+          .descendant(of: expensesCard, matching: find.byType(Row))
+          .first;
+      final incomeHeader = find
+          .descendant(of: incomeCard, matching: find.byType(Row))
+          .first;
+      expect(
+        find.descendant(of: expenseHeader, matching: find.text('KSh 80.00')),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: incomeHeader, matching: find.text('KSh 200.00')),
+        findsNothing,
+      );
       expect(tester.takeException(), isNull);
     });
   }
