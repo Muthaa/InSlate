@@ -34,6 +34,15 @@ class YourDataScreen extends ConsumerWidget {
         : title.startsWith('Registered')
         ? Icons.account_balance_outlined
         : Icons.account_balance_wallet_outlined;
+    final balanceCard = title.startsWith('Balance observations');
+    final heading = Text(
+      title,
+      style: const TextStyle(
+        fontSize: 15,
+        fontWeight: FontWeight.w700,
+        color: AppTheme.darkBlue,
+      ),
+    );
     return Material(
       key: ValueKey('your-data.${title.split(':').first}'),
       color: const Color(0xFFE7EEF5),
@@ -61,7 +70,11 @@ class YourDataScreen extends ConsumerWidget {
                     ),
                     child: Icon(icon, size: 20, color: AppTheme.darkBlue),
                   ),
-                  const Spacer(),
+                  if (balanceCard) ...[
+                    const SizedBox(width: 10),
+                    Expanded(child: heading),
+                  ] else
+                    const Spacer(),
                   if (target != null)
                     const Icon(
                       Icons.arrow_outward_rounded,
@@ -70,15 +83,7 @@ class YourDataScreen extends ConsumerWidget {
                     ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.darkBlue,
-                ),
-              ),
+              if (!balanceCard) ...[const SizedBox(height: 12), heading],
               const SizedBox(height: 6),
               Text(
                 detail,
@@ -130,7 +135,7 @@ class YourDataScreen extends ConsumerWidget {
           children: [
             Container(
               margin: const EdgeInsets.only(bottom: 20),
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
                 color: AppTheme.darkBlue.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(18),
@@ -239,7 +244,10 @@ class YourDataScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            const VerifiedReversalsSection(),
+            const Padding(
+              padding: EdgeInsets.only(top: 16),
+              child: VerifiedReversalsSection(),
+            ),
             Card(
               color: Colors.white,
               margin: const EdgeInsets.only(top: 16),

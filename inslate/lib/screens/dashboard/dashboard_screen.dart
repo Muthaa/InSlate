@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'financial_breakdown_screen.dart';
 import 'dashboard_budget_section.dart';
-import '../../widgets/unspecified_movements_card.dart';
 import '../profile/profile_overview_screen.dart';
 import '../../providers/app_preferences_provider.dart';
 import '../../services/app_preferences.dart';
@@ -150,8 +149,6 @@ class _DashboardContent extends StatelessWidget {
           _MoneyMovementCard(summary: summary),
           const SizedBox(height: 16),
           _OverviewCard(summary: summary),
-          const SizedBox(height: 16),
-          UnspecifiedMovementsCard(period: summary.period),
           const SizedBox(height: 16),
           _PeriodDataVisibility(
             child: DashboardBudgetSection(period: summary.period),

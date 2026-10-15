@@ -12,6 +12,6 @@ Both grids use the shared `ResponsiveCardGrid`, which aligns card heights within
 
 - [Horizontal Home budgets](v2-captures/grids/home-budgets.png), with synthetic targets and progress
 - [Profile light](v2-captures/grids/profile-light.png) and [dark](v2-captures/grids/profile-dark.png)
-- [Your Data](v2-captures/grids/your-data.png), with an empty test database and its built-in categories
+- [Your Data](v2-captures/refinements/your-data.png), with an empty test database and its built-in categories
 
 78 focused Dashboard, budget, Profile, Your Data, AppShell and device-inset widget checks pass, including horizontal access beyond three budgets, unchanged overspending values, grid ordering, retained destinations and doubled text sizes. Analyzer and formatting checks pass. No database, financial calculation, categorization or mapping changes are included.

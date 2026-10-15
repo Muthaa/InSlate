@@ -1,4 +1,6 @@
 import 'package:drift/native.dart';
+import 'package:inslate/core/theme/app_theme.dart';
+import '../helpers/widget_capture.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -33,16 +35,107 @@ void main() {
     });
   }
 
-  Future<void> open(WidgetTester tester, {FinancialPeriod? initial}) async {
+  Future<void> open(
+    WidgetTester tester, {
+    FinancialPeriod? initial,
+    bool large = false,
+    GlobalKey? boundary,
+  }) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [databaseProvider.overrideWithValue(db)],
-        child: MaterialApp(
-          home: InsightsScreen(initialPeriod: initial ?? period),
+        child: RepaintBoundary(
+          key: boundary,
+          child: MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: TextScaler.linear(large ? 1.6 : 1)),
+              child: child!,
+            ),
+            home: InsightsScreen(initialPeriod: initial ?? period),
+          ),
         ),
       ),
     );
     await tester.pumpAndSettle();
+  }
+
+  for (final large in [false, true]) {
+    testUi('comparison retains all values in overview layout, large $large', (
+      tester,
+    ) async {
+      tester.view.physicalSize = Size(large ? 320 : 430, 1100);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await loadCaptureFonts(tester);
+      await tester.runAsync(
+        () => FinancialRecordsRepository(db).saveAll([
+          record(RecordSubtype.receiveMoney, 200, date: DateTime(2026, 9, 10)),
+          record(
+            RecordSubtype.buyGoods,
+            80,
+            fee: 4,
+            date: DateTime(2026, 9, 10),
+          ),
+          record(RecordSubtype.receiveMoney, 100, date: DateTime(2026, 8, 10)),
+          record(
+            RecordSubtype.buyGoods,
+            60,
+            fee: 3,
+            date: DateTime(2026, 8, 10),
+          ),
+        ]),
+      );
+      final boundary = GlobalKey();
+      await open(tester, large: large, boundary: boundary);
+      final income = find.byKey(const ValueKey('insights.comparison.income'));
+      final expense = find.byKey(
+        const ValueKey('insights.comparison.spending'),
+      );
+      await tester.scrollUntilVisible(income, 250);
+      final incomeRect = tester.getRect(income);
+      final expenseRect = tester.getRect(expense);
+      if (large) {
+        expect(expenseRect.top, greaterThan(incomeRect.bottom));
+      } else {
+        expect(expenseRect.top, incomeRect.top);
+        expect(expenseRect.left, greaterThan(incomeRect.right));
+      }
+      for (final value in {
+        'income': ('+KSh 100.00', '100.0% more'),
+        'spending': ('+KSh 20.00', '33.3% more'),
+        'fees': ('+KSh 1.00', '33.3% more'),
+        'net cash flow': ('+KSh 79.00', '213.5% more'),
+      }.entries) {
+        final metric = find.byKey(ValueKey('insights.comparison.${value.key}'));
+        expect(
+          find.descendant(of: metric, matching: find.text(value.value.$1)),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: metric, matching: find.text(value.value.$2)),
+          findsOneWidget,
+        );
+      }
+      expect(find.text('2 records in comparison period'), findsOneWidget);
+      if (!large) {
+        await tester.ensureVisible(find.text('Compared with preceding period'));
+        await tester.pumpAndSettle();
+        await captureWidget(tester, boundary, 'insights-comparison');
+      }
+      await tester.scrollUntilVisible(
+        find.text('Expense purpose categories'),
+        250,
+      );
+      await tester.ensureVisible(find.text('Expense purpose categories'));
+      await tester.pumpAndSettle();
+      if (!large) await captureWidget(tester, boundary, 'insights-categories');
+      expect(tester.takeException(), isNull);
+    });
   }
 
   testUi(

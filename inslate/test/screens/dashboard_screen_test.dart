@@ -225,6 +225,7 @@ void main() {
     (tester) async {
       await open(tester);
       expect(repository.periodReads, 1);
+      expect(find.text('Purpose unspecified'), findsNothing);
       expect(find.text('Into M-PESA'), findsOneWidget);
       expect(find.text('From M-PESA'), findsOneWidget);
       await tester.scrollUntilVisible(

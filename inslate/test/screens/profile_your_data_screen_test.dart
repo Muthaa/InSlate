@@ -125,6 +125,34 @@ void main() {
         expect(sms.top, greaterThan(records.bottom));
         expect(sms.left, records.left);
       } else {
+        final balanceCard = find.byKey(
+          const ValueKey('your-data.Balance observations'),
+        );
+        expect(tester.getRect(balanceCard).height, lessThan(120));
+        final header = find
+            .descendant(of: balanceCard, matching: find.byType(Row))
+            .first;
+        expect(
+          find.descendant(
+            of: header,
+            matching: find.text('Balance observations: 0'),
+          ),
+          findsOneWidget,
+        );
+        final instruments = tester.getRect(
+          find.byKey(
+            const ValueKey('your-data.Registered financial instruments'),
+          ),
+        );
+        final reversals = tester.getRect(
+          find
+              .ancestor(
+                of: find.text('Verified PayBill reversals'),
+                matching: find.byType(Card),
+              )
+              .first,
+        );
+        expect(reversals.top - instruments.bottom, greaterThanOrEqualTo(16));
         expect(sms.top, records.top);
         expect(sms.left, greaterThan(records.right));
         await captureWidget(tester, boundary, 'your-data');

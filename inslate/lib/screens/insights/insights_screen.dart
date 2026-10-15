@@ -153,6 +153,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     IconData? icon,
     Color? accent,
     Widget? action,
+    bool compact = false,
   }) => Card(
     color: Colors.white,
     surfaceTintColor: Colors.transparent,
@@ -164,14 +165,14 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
           Row(
             children: [
               if (icon != null) ...[
-                Icon(icon, color: accent, size: 22),
+                Icon(icon, color: accent, size: compact ? 19 : 22),
                 const SizedBox(width: 10),
               ],
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 18,
+                  style: TextStyle(
+                    fontSize: compact ? 16 : 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -275,134 +276,158 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     bool expense = false,
   }) {
     final accent = expense ? Colors.red.shade700 : AppTheme.teal;
-    final icon = expense
-        ? Icons.remove_circle_outline
-        : Icons.add_circle_outline;
     return Padding(
       padding: const EdgeInsets.only(top: 16),
       child: _section(
         expense ? 'Expense purpose categories' : 'Income purpose categories',
         [
+          const Divider(height: 4),
           if (groups.isEmpty)
-            Text(
-              expense
-                  ? 'No ordinary expenses in this period.'
-                  : 'No ordinary income in this period.',
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                expense
+                    ? 'No ordinary expenses in this period.'
+                    : 'No ordinary income in this period.',
+              ),
             ),
           for (final group in groups)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Material(
-                color: AppTheme.appBackground,
-                borderRadius: BorderRadius.circular(14),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(14),
-                  key: ValueKey(
-                    'insights.category.${expense ? 'expenses' : 'income'}.${group.id ?? 'uncategorized'}',
-                  ),
-                  onTap: () => _open(group.filter),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            InkWell(
+              key: ValueKey(
+                'insights.category.${expense ? 'expenses' : 'income'}.${group.id ?? 'uncategorized'}',
+              ),
+              borderRadius: BorderRadius.circular(10),
+              onTap: () => _open(group.filter),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: accent.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Icon(icon, size: 20, color: accent),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
                                 '${group.name}${group.hidden ? ' (hidden)' : ''}',
                                 style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.darkBlue,
-                                ),
-                              ),
-                            ),
-                            Icon(
-                              Icons.chevron_right,
-                              size: 20,
-                              color: Colors.grey,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 6,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            Text(
-                              formatMoney(group.amount),
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: accent,
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                group.share(total) == null
-                                    ? (expense
-                                          ? (total == 0
-                                                ? 'Share unavailable (zero total)'
-                                                : 'Share unavailable (negative net total)')
-                                          : 'Share unavailable')
-                                    : '${(group.share(total)! * 100).toStringAsFixed(1)}%',
-                                style: TextStyle(
                                   fontSize: 12,
-                                  color: AppTheme.darkBlue,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade700,
                                 ),
                               ),
-                            ),
-                            Text(
-                              '${group.count} ${group.count == 1 ? 'transaction' : 'transactions'}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade600,
+                              const SizedBox(height: 2),
+                              Text(
+                                '${group.count} ${group.count == 1 ? 'transaction' : 'transactions'}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey.shade600,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                        if (group.amount >= 0 && total > 0) ...[
-                          const SizedBox(height: 10),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              minHeight: 5,
-                              value: (group.share(total) ?? 0).clamp(0, 1),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            formatMoney(group.amount),
+                            textAlign: TextAlign.end,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
                               color: accent,
-                              backgroundColor: Colors.white,
                             ),
                           ),
-                        ],
+                        ),
+                        const Icon(Icons.chevron_right_rounded, size: 18),
                       ],
                     ),
-                  ),
+                    const SizedBox(height: 8),
+                    if (group.amount >= 0 && total > 0)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: (group.share(total) ?? 0).clamp(0, 1),
+                                minHeight: 5,
+                                color: accent,
+                                backgroundColor: Colors.grey.shade100,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            '${(group.share(total)! * 100).toStringAsFixed(1)}%',
+                            style: TextStyle(fontSize: 11, color: accent),
+                          ),
+                        ],
+                      )
+                    else
+                      Text(
+                        group.share(total) == null
+                            ? (expense
+                                  ? (total == 0
+                                        ? 'Share unavailable (zero total)'
+                                        : 'Share unavailable (negative net total)')
+                                  : 'Share unavailable')
+                            : '${(group.share(total)! * 100).toStringAsFixed(1)}%',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
         ],
-        icon: icon,
+        compact: true,
+        icon: expense ? Icons.remove_circle_outline : Icons.add_circle_outline,
         accent: accent,
+        action: SizedBox(
+          width: 96,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerRight,
+            child: Text(
+              formatMoney(total),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: accent,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
+
+  Widget _comparisonPair(Widget first, Widget second) => LayoutBuilder(
+    builder: (context, constraints) {
+      if (constraints.maxWidth < 280 ||
+          MediaQuery.textScalerOf(context).scale(16) > 22) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [first, const SizedBox(height: 8), second],
+        );
+      }
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: first),
+          const SizedBox(width: 12),
+          Expanded(child: second),
+        ],
+      );
+    },
+  );
 
   Widget _comparison(InsightsSummary s) {
     Widget changeRow(
@@ -425,13 +450,9 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
           ? 'No change in $subject'
           : '${change.percentage!.abs().toStringAsFixed(1)}% ${change.percentage! < 0 ? 'less' : 'more'}';
       final color = change.absolute == 0 ? Colors.grey.shade600 : accent;
-      return Container(
-        margin: const EdgeInsets.only(top: 8),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: accent.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(14),
-        ),
+      return Padding(
+        key: ValueKey('insights.comparison.$subject'),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -457,10 +478,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
               ],
             ),
             const SizedBox(height: 8),
-            Wrap(
-              spacing: 10,
-              runSpacing: 6,
-              crossAxisAlignment: WrapCrossAlignment.center,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   '${change.absolute > 0 ? '+' : ''}${formatMoney(change.absolute)}',
@@ -470,6 +489,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                     color: color,
                   ),
                 ),
+                const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
@@ -540,33 +560,38 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
               ),
             )
           else ...[
-            changeRow(
-              'Income',
-              s.totals.income,
-              s.previousTotals.income,
-              Icons.add_circle_outline,
-              AppTheme.teal,
+            _comparisonPair(
+              changeRow(
+                'Income',
+                s.totals.income,
+                s.previousTotals.income,
+                Icons.add_circle_outline,
+                AppTheme.teal,
+              ),
+              changeRow(
+                'Expenses',
+                s.totals.expenses,
+                s.previousTotals.expenses,
+                Icons.remove_circle_outline,
+                Colors.red.shade700,
+              ),
             ),
-            changeRow(
-              'Expenses',
-              s.totals.expenses,
-              s.previousTotals.expenses,
-              Icons.remove_circle_outline,
-              Colors.red.shade700,
-            ),
-            changeRow(
-              'Fees',
-              s.totals.fees,
-              s.previousTotals.fees,
-              Icons.receipt_outlined,
-              Colors.amber.shade800,
-            ),
-            changeRow(
-              'Net cash flow',
-              s.totals.netCashFlow,
-              s.previousTotals.netCashFlow,
-              Icons.swap_vert,
-              Colors.blue.shade700,
+            const Divider(height: 24),
+            _comparisonPair(
+              changeRow(
+                'Fees',
+                s.totals.fees,
+                s.previousTotals.fees,
+                Icons.receipt_outlined,
+                Colors.amber.shade800,
+              ),
+              changeRow(
+                'Net cash flow',
+                s.totals.netCashFlow,
+                s.previousTotals.netCashFlow,
+                Icons.swap_vert,
+                Colors.blue.shade700,
+              ),
             ),
           ],
         ],
