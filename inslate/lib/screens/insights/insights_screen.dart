@@ -9,6 +9,7 @@ import '../../providers/insights_provider.dart';
 import '../../providers/repository_providers.dart';
 import '../activity/activity_screen.dart';
 import 'insight_trend_chart.dart';
+import 'insight_category_donut.dart';
 import '../../widgets/app_dialog.dart';
 import '../../widgets/unspecified_movements_card.dart';
 
@@ -281,111 +282,12 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
       child: _section(
         expense ? 'Expense purpose categories' : 'Income purpose categories',
         [
-          const Divider(height: 4),
-          if (groups.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Text(
-                expense
-                    ? 'No ordinary expenses in this period.'
-                    : 'No ordinary income in this period.',
-              ),
-            ),
-          for (final group in groups)
-            InkWell(
-              key: ValueKey(
-                'insights.category.${expense ? 'expenses' : 'income'}.${group.id ?? 'uncategorized'}',
-              ),
-              borderRadius: BorderRadius.circular(10),
-              onTap: () => _open(group.filter),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 12,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${group.name}${group.hidden ? ' (hidden)' : ''}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.grey.shade700,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '${group.count} ${group.count == 1 ? 'transaction' : 'transactions'}',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            formatMoney(group.amount),
-                            textAlign: TextAlign.end,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                              color: accent,
-                            ),
-                          ),
-                        ),
-                        const Icon(Icons.chevron_right_rounded, size: 18),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    if (group.amount >= 0 && total > 0)
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
-                              child: LinearProgressIndicator(
-                                value: (group.share(total) ?? 0).clamp(0, 1),
-                                minHeight: 5,
-                                color: accent,
-                                backgroundColor: Colors.grey.shade100,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            '${(group.share(total)! * 100).toStringAsFixed(1)}%',
-                            style: TextStyle(fontSize: 11, color: accent),
-                          ),
-                        ],
-                      )
-                    else
-                      Text(
-                        group.share(total) == null
-                            ? (expense
-                                  ? (total == 0
-                                        ? 'Share unavailable (zero total)'
-                                        : 'Share unavailable (negative net total)')
-                                  : 'Share unavailable')
-                            : '${(group.share(total)! * 100).toStringAsFixed(1)}%',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
+          InsightCategoryDonut(
+            groups: groups,
+            total: total,
+            expense: expense,
+            onOpen: _open,
+          ),
         ],
         compact: true,
         icon: expense ? Icons.remove_circle_outline : Icons.add_circle_outline,

@@ -2,7 +2,7 @@
 
 Home no longer displays Purpose unspecified. The section remains in Insights, and the underlying financial semantics, repositories and transaction data are unchanged.
 
-Insights expense and income purpose categories now follow Home's compact category presentation: small labels and amounts, transaction counts, share bars and direct transaction drill-downs. Every category remains available, including hidden/uncategorized groups. Shares retain their previous precision and zero/negative-total explanations. Compact rows are preferable to a circular breakdown here because they keep exact amounts and drill-downs readable and can represent negative adjustments and unavailable shares explicitly.
+Insights expense and income purpose categories now use [donut charts with exact category legends](Insights_Category_Donuts.md). Zero, negative or inconsistent distributions remain explicit and preserve signed amounts and drill-downs.
 
 Compared with preceding period now uses the Overview arrangement: Income/Expenses together, then Fees/Net cash flow separated by a divider. The comparison period and record count remain above the metrics. Every metric retains its directional icon, signed absolute difference, percentage wording and unavailable-baseline handling. Narrow screens or enlarged text use a single column.
 
@@ -12,7 +12,7 @@ Your Data's device banner has 12 fewer logical pixels of vertical padding. Balan
 
 - [Home](v2-captures/refinements/home.png)
 - [Insights comparison](v2-captures/refinements/insights-comparison.png)
-- [Insights category rows](v2-captures/refinements/insights-categories.png)
+- [Insights category rows](v2-captures/donuts/insights-categories.png)
 - [Your Data](v2-captures/refinements/your-data.png)
 
 Captures use synthetic records and actual Flutter rendering. 53 focused Home, Insights and Your Data checks pass; final Insights/capture checks pass after alignment adjustments. Coverage includes retained comparison values and percentages, two-column/single-column behavior, hidden-category drill-downs, zero-total shares, compact card structure and reversal spacing. Analyzer, formatting and whitespace checks pass.
