@@ -47,3 +47,10 @@ The existing `InsightChange` calculation is unchanged. Missing records in either
 - [After: combined overview and comparison](v2-captures/donuts/insights-overview-comparison.png)
 
 Captures use synthetic records.
+
+
+### Overview spacing and comparison colors
+
+The comparison subtitle sits 2 logical pixels below the Overview title in the same header block, avoiding the extra gap caused by the info button's touch target. The footer now reads “financial records in selected period”. Percentage text and direction icons use the existing accessible semantic palette: green for higher income/net cash flow or lower expenses/fees, red for the reverse, and muted gray for unchanged or unavailable percentages. Signed amount differences remain neutral. Labels and arrows continue to communicate meaning without color alone; calculations are unchanged.
+
+All 10 focused Insights screen tests pass, including normal/enlarged-text header spacing, favorable/unfavorable comparison colors and neutral nonpositive-baseline states. Scoped analyzer, formatting and whitespace checks pass. The combined-overview capture above is refreshed.

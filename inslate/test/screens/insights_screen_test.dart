@@ -1,5 +1,6 @@
 import 'package:drift/native.dart';
 import 'package:inslate/core/theme/app_theme.dart';
+import 'package:inslate/core/design/design_tokens.dart';
 import '../helpers/widget_capture.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -120,6 +121,15 @@ void main() {
           find.descendant(of: metric, matching: find.text(value.value.$2)),
           findsOneWidget,
         );
+        final percentage = tester.widget<Text>(
+          find.descendant(of: metric, matching: find.text(value.value.$2)),
+        );
+        expect(
+          percentage.style!.color,
+          value.key == 'income' || value.key == 'net cash flow'
+              ? SlateColors.light.income
+              : SlateColors.light.spending,
+        );
       }
       expect(find.text('2 records in comparison period'), findsOneWidget);
       expect(find.text('Selected period: September 2026'), findsOneWidget);
@@ -136,6 +146,11 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Compared with preceding period'), findsOneWidget);
+      expect(
+        tester.getRect(find.text('Compared with preceding period')).top -
+            tester.getRect(find.text('Overview')).bottom,
+        lessThanOrEqualTo(3),
+      );
       for (final amount in [200, 80, 4, 116]) {
         expect(
           find.descendant(
@@ -238,6 +253,25 @@ void main() {
       ),
       findsOneWidget,
     );
+    expect(
+      tester
+          .widget<Text>(
+            find.descendant(of: income, matching: find.text('50.0% less')),
+          )
+          .style!
+          .color,
+      SlateColors.light.spending,
+    );
+    final expenses = find.byKey(const ValueKey('insights.comparison.spending'));
+    expect(
+      tester
+          .widget<Text>(
+            find.descendant(of: expenses, matching: find.text('33.3% less')),
+          )
+          .style!
+          .color,
+      SlateColors.light.income,
+    );
     final fees = find.byKey(const ValueKey('insights.comparison.fees'));
     final net = find.byKey(const ValueKey('insights.comparison.net cash flow'));
     for (final metric in [fees, net]) {
@@ -256,6 +290,20 @@ void main() {
           matching: find.byIcon(Icons.horizontal_rule),
         ),
         findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<Text>(
+              find.descendant(
+                of: metric,
+                matching: find.text(
+                  'Percentage unavailable (zero or negative baseline)',
+                ),
+              ),
+            )
+            .style!
+            .color,
+        SlateColors.light.muted,
       );
     }
     expect(tester.takeException(), isNull);
@@ -306,7 +354,10 @@ void main() {
         await repo.setHidden('builtin.expense.food', true);
       });
       await open(tester);
-      expect(find.text('4 financial records in this period'), findsOneWidget);
+      expect(
+        find.text('4 financial records in selected period'),
+        findsOneWidget,
+      );
       expect(find.text(formatMoney(9)), findsOneWidget);
       expect(find.text(formatMoney(91)), findsOneWidget);
       final category = find.byKey(
@@ -448,7 +499,10 @@ void main() {
       await tester.enterText(fields.at(1), '09/11/2026');
       await tester.tap(find.text('OK'));
       await tester.pumpAndSettle();
-      expect(find.text('2 financial records in this period'), findsOneWidget);
+      expect(
+        find.text('2 financial records in selected period'),
+        findsOneWidget,
+      );
       expect(find.text(formatMoney(30)), findsWidgets);
       await tester.tap(find.widgetWithText(ListTile, 'Income').first);
       await tester.pumpAndSettle();
@@ -462,7 +516,10 @@ void main() {
       expect(find.text('2 transactions'), findsOneWidget);
       await tester.pageBack();
       await tester.pumpAndSettle();
-      expect(find.text('2 financial records in this period'), findsOneWidget);
+      expect(
+        find.text('2 financial records in selected period'),
+        findsOneWidget,
+      );
     },
   );
   testUi('no records is distinct from zero-valued financial records', (
@@ -477,7 +534,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('No records in this period'), findsNothing);
-    expect(find.text('1 financial records in this period'), findsOneWidget);
+    expect(find.text('1 financial records in selected period'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.textContaining('Share unavailable'),
       300,

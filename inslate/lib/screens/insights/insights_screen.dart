@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/design/design_tokens.dart';
 import '../../core/presentation/financial_presentation.dart';
 import '../../models/activity_filter.dart';
 import '../../models/financial_period.dart';
@@ -154,6 +155,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     IconData? icon,
     Color? accent,
     Widget? action,
+    String? subtitle,
     bool compact = false,
   }) => Card(
     color: Colors.white,
@@ -170,12 +172,28 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                 const SizedBox(width: 10),
               ],
               Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: compact ? 16 : 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: compact ? 16 : 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.blueGrey.shade700,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               ?action,
@@ -224,8 +242,20 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
         : change.absolute > 0
         ? Icons.arrow_upward_rounded
         : Icons.arrow_downward_rounded;
-    // Direction describes arithmetic change, not whether it is good or bad.
-    final changeColor = Colors.blueGrey.shade700;
+    final palette = SlateColors.of(context);
+    final changeColor = palette.muted;
+    final lowerIsFavorable = label == 'Expenses' || label == 'Fees';
+    final favorable = lowerIsFavorable
+        ? change.absolute < 0
+        : change.absolute > 0;
+    final percentageColor =
+        !comparisonAvailable ||
+            change.percentage == null ||
+            change.absolute == 0
+        ? palette.muted
+        : favorable
+        ? palette.income
+        : palette.spending;
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(14),
@@ -284,12 +314,15 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(direction, size: 16, color: changeColor),
+                      Icon(direction, size: 16, color: percentageColor),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
                           percentageLabel,
-                          style: TextStyle(fontSize: 12, color: changeColor),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: percentageColor,
+                          ),
                         ),
                       ),
                     ],
@@ -569,15 +602,6 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                 _section(
                   'Overview',
                   [
-                    Text(
-                      'Compared with preceding period',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.blueGrey.shade700,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
@@ -664,7 +688,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        '${s.recordCount} financial records in this period',
+                        '${s.recordCount} financial records in selected period',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey.shade600,
@@ -672,6 +696,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                       ),
                     ),
                   ],
+                  subtitle: 'Compared with preceding period',
                   icon: Icons.account_balance_wallet_outlined,
                   accent: AppTheme.darkBlue,
                   action: IconButton(
