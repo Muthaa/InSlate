@@ -390,7 +390,7 @@ class _DashboardHeader extends ConsumerWidget {
                   ref.watch(appPreferencesProvider).valueOrNull?.localAvatar ??
                       LocalAvatar.astronaut,
                 ),
-                color: const Color(0xFFFFDE59),
+                color: Colors.white,
                 size: 24,
               ),
             ),

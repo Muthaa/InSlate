@@ -209,46 +209,37 @@ class _FinanceGrid extends StatelessWidget {
                   context,
                 ).push(MaterialPageRoute<void>(builder: (_) => item.screen)),
                 child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 14,
+                  ),
+                  child: Row(
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: item.accent.withValues(alpha: 0.10),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Icon(
-                              item.icon,
-                              color: item.accent,
-                              size: 24,
-                            ),
-                          ),
-                          const Spacer(),
-                          Icon(
-                            Icons.arrow_outward_rounded,
-                            size: 18,
-                            color: colors.muted,
-                          ),
-                        ],
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: item.accent.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(item.icon, color: item.accent, size: 20),
                       ),
-                      const SizedBox(height: 20),
-                      Text(
-                        item.title,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: colors.ink,
-                          fontWeight: FontWeight.w700,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          item.title,
+                          semanticsLabel: '${item.title}. ${item.subtitle}',
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(
+                                color: colors.ink,
+                                fontWeight: FontWeight.w700,
+                              ),
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        item.subtitle,
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodySmall?.copyWith(color: colors.muted),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.arrow_outward_rounded,
+                        size: 16,
+                        color: colors.muted,
                       ),
                     ],
                   ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/design/design_tokens.dart';
+import '../core/theme/app_theme.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'profile/profile_overview_screen.dart';
 import 'insights/insights_screen.dart';
@@ -74,39 +75,62 @@ class _AppShellState extends ConsumerState<AppShell>
       body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: SlateColors.of(context).surface,
-          border: Border(top: BorderSide(color: SlateColors.of(context).line)),
+          color: AppTheme.darkBlue,
+          border: Border(top: BorderSide(color: Colors.white12)),
         ),
-        child: NavigationBar(
-          backgroundColor: SlateColors.of(context).surface,
-          elevation: 0,
-          height: 72,
-          selectedIndex: _currentIndex,
-          onDestinationSelected: _selectTab,
-          indicatorColor: SlateColors.of(context).inset,
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.dashboard_outlined),
-              selectedIcon: Icon(Icons.dashboard_rounded),
-              label: 'Home',
+        child: NavigationBarTheme(
+          data: NavigationBarThemeData(
+            iconTheme: WidgetStateProperty.resolveWith(
+              (states) => IconThemeData(
+                color: states.contains(WidgetState.selected)
+                    ? SlateColors.brandYellow
+                    : Colors.white70,
+              ),
             ),
-            NavigationDestination(
-              icon: Icon(Icons.history_rounded),
-              selectedIcon: Icon(Icons.history_rounded),
-              label: 'Activity',
+            labelTextStyle: WidgetStateProperty.resolveWith(
+              (states) => TextStyle(
+                fontSize: 12,
+                fontWeight: states.contains(WidgetState.selected)
+                    ? FontWeight.w700
+                    : FontWeight.w500,
+                color: states.contains(WidgetState.selected)
+                    ? Colors.white
+                    : Colors.white70,
+              ),
             ),
-            NavigationDestination(
-              icon: Icon(Icons.insights_outlined),
-              selectedIcon: Icon(Icons.insights_rounded),
-              label: 'Insights',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline_rounded),
-              selectedIcon: Icon(Icons.person_rounded),
-              label: 'Profile',
-            ),
-          ],
+          ),
+          child: NavigationBar(
+            backgroundColor: AppTheme.darkBlue,
+            elevation: 0,
+            height: 72,
+            selectedIndex: _currentIndex,
+            onDestinationSelected: _selectTab,
+            indicatorColor: Colors.white.withValues(alpha: 0.12),
+            surfaceTintColor: Colors.transparent,
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.dashboard_outlined),
+                selectedIcon: Icon(Icons.dashboard_rounded),
+                label: 'Home',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.history_rounded),
+                selectedIcon: Icon(Icons.history_rounded),
+                label: 'Activity',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.insights_outlined),
+                selectedIcon: Icon(Icons.insights_rounded),
+                label: 'Insights',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.person_outline_rounded),
+                selectedIcon: Icon(Icons.person_rounded),
+                label: 'Profile',
+              ),
+            ],
+          ),
         ),
       ),
     );

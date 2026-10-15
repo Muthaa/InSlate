@@ -76,6 +76,8 @@ void main() {
           expect(data.left, budgets.left);
         } else {
           expect(data.top, budgets.top);
+          expect(budgets.height, lessThan(110));
+          expect(data.height, budgets.height);
           expect(data.left, greaterThan(budgets.right));
         }
         expect(find.byIcon(Icons.rocket_launch_rounded), findsOneWidget);
