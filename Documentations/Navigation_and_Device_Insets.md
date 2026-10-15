@@ -8,7 +8,7 @@
 - Pushed routes keep their existing full-screen behavior and back stack. System Back returns to the previous selected tab or dismisses the current dialog/sheet; this change does not introduce a separate Navigator or change app-exit behavior.
 - Top padding remains available to each AppBar or custom header. The restored Dashboard's layout and styling are unchanged.
 - Keyboard resizing remains owned by Scaffold. The viewport does not permanently reserve `viewPadding.bottom` while the keyboard is open, which would create an extra gap above the keyboard.
-- System navigation icons use the current theme's contrast, with Android contrast enforcement retained. The app paints behind the reserved area and requests a transparent system navigation background; the OS controls supported edge-to-edge behavior.
+- The reserved phone navigation area uses the same navy background as the app tab bar, with light system navigation icons in both themes. The app paints navy behind edge-to-edge navigation and requests navy for Android versions that honor system bar colors. Automatic contrast scrims are disabled because the explicit navy/light palette supplies contrast; the OS controls supported navigation behavior.
 
 The shared `showSlateSheet` helper also applies its own bottom safe area, making it safe when used outside the app viewport. It retains scrollable content and keyboard padding. Existing Material dialogs, menus, pickers and other modal routes benefit from the app-level boundary without individual fixed bottom offsets. Modals retain their normal barrier behavior over the tab bar.
 
@@ -26,7 +26,7 @@ Activity's controls can exceed the available height in landscape or with a large
 - A profile page without a local safe area and the final instrument-form save action.
 - Keyboard resizing with search focus/text retained and reachable form/pagination actions.
 - Shared sheets both inside and outside the app viewport, with and without keyboard insets.
-- Dialog dismissal by system Back and theme-aware system navigation icon contrast.
+- Dialog dismissal by system Back and navy phone navigation with light icons in both themes.
 
 The 37 focused navigation, Activity/search and app-shell checks pass. A broader run passed 126 checks and reproduced five pre-existing failures: four category-filter tests still expect obsolete pagination labels, and an avatar-selection test leaves its picker open after selection. The same five failures were reproduced on the unchanged baseline; those files and behaviors were not changed here. Application code and the new test file analyze cleanly; changed Dart files pass formatting and whitespace checks. Device insets are simulated in widget tests; physical Android gesture/three-button modes have not been exercised here. Financial data, schema, repository behavior and calculations are unchanged.
 

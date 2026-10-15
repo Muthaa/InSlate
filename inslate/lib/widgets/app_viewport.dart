@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../core/theme/app_theme.dart';
 
 /// The Navigator and all of its routes/overlays share one device-safe viewport.
 ///
@@ -14,18 +15,17 @@ class AppViewport extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
-        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarColor: AppTheme.darkBlue,
         systemNavigationBarDividerColor: Colors.transparent,
-        systemNavigationBarIconBrightness: theme.brightness == Brightness.dark
-            ? Brightness.light
-            : Brightness.dark,
-        systemNavigationBarContrastEnforced: true,
+        systemNavigationBarIconBrightness: Brightness.light,
+        systemNavigationBarContrastEnforced: false,
       ),
       child: ColoredBox(
-        color: theme.scaffoldBackgroundColor,
+        // Paint behind edge-to-edge Android navigation as well as requesting
+        // the same color on Android versions that honor the system bar color.
+        color: AppTheme.darkBlue,
         child: SafeArea(top: false, child: child),
       ),
     );

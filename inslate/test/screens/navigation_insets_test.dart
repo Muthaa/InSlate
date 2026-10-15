@@ -376,7 +376,9 @@ void main() {
       expect(find.text('Open dialog'), findsOneWidget);
     },
   );
-  uiTest('system navigation icons follow the current theme', (tester) async {
+  uiTest('phone navigation matches the navy app tabs in both themes', (
+    tester,
+  ) async {
     device(tester);
     for (final dark in [false, true]) {
       await open(
@@ -391,8 +393,9 @@ void main() {
         regions.any(
           (region) =>
               region.value.systemNavigationBarIconBrightness ==
-                  (dark ? Brightness.light : Brightness.dark) &&
-              region.value.systemNavigationBarContrastEnforced == true,
+                  Brightness.light &&
+              region.value.systemNavigationBarColor == AppTheme.darkBlue &&
+              region.value.systemNavigationBarContrastEnforced == false,
         ),
         isTrue,
       );
