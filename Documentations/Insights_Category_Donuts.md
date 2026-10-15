@@ -34,3 +34,16 @@ Donut segments and legend icons now share a centralized `CategoryVisual` keyed b
 Uncategorized entries use neutral gray and a question-mark icon. Custom expense categories use stable warm hues; custom income categories use stable green/blue/violet hues, derived from their IDs with contrast adjustment. Category colors identify purpose rather than financial desirability; amount colors continue to express income/expense meaning. Labels, icons, amounts and percentages keep the chart usable without relying on color alone.
 
 21 focused color/donut/Insights checks pass. They verify distinct built-in colors, graphic contrast, custom icon-surface contrast, unchanged identities after reordering/renaming/hiding, drill-downs and signed/zero-value handling. Analyzer, formatting and whitespace checks pass. Rendered captures above are refreshed with actual built-in category IDs and synthetic amounts.
+
+## Unified Insights overview
+
+The Overview now includes the subtitle “Compared with preceding period”, selected and comparison period labels, and the comparison record count. Each Income, Expenses, Fees and Net cash flow section shows its current total followed by the signed amount difference, percentage less/more, and an up/down arrow (or a horizontal unchanged indicator). The separate comparison card is removed. Income/expense drill-downs and the selected-period record count remain available.
+
+The existing `InsightChange` calculation is unchanged. Missing records in either period make differences unavailable; zero/negative baselines keep the absolute difference while explaining why a percentage is unavailable. Direction describes arithmetic movement rather than financial desirability. Metric pairs stack on narrow screens or with enlarged text.
+
+23 focused color/chart/Insights tests pass, covering the combined hierarchy, current totals, differences, direction icons, nonpositive baselines, missing comparison populations, exact period drill-downs and enlarged text. Scoped analyzer, formatting and whitespace checks pass.
+
+- [Before: separate comparison card](v2-captures/donuts/insights-comparison.png)
+- [After: combined overview and comparison](v2-captures/donuts/insights-overview-comparison.png)
+
+Captures use synthetic records.

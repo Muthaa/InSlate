@@ -64,7 +64,7 @@ void main() {
   }
 
   for (final large in [false, true]) {
-    testUi('comparison retains all values in overview layout, large $large', (
+    testUi('overview combines current totals and comparisons, large $large', (
       tester,
     ) async {
       tester.view.physicalSize = Size(large ? 320 : 430, 1100);
@@ -122,10 +122,40 @@ void main() {
         );
       }
       expect(find.text('2 records in comparison period'), findsOneWidget);
+      expect(find.text('Selected period: September 2026'), findsOneWidget);
+      expect(find.text('Comparison period: August 2026'), findsOneWidget);
+      final overview = find.ancestor(
+        of: find.text('Overview'),
+        matching: find.byType(Card),
+      );
+      expect(
+        find.descendant(
+          of: overview,
+          matching: find.text('Compared with preceding period'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Compared with preceding period'), findsOneWidget);
+      for (final amount in [200, 80, 4, 116]) {
+        expect(
+          find.descendant(
+            of: overview,
+            matching: find.text(formatMoney(amount.toDouble())),
+          ),
+          findsOneWidget,
+        );
+      }
+      expect(
+        find.descendant(
+          of: overview,
+          matching: find.byIcon(Icons.arrow_upward_rounded),
+        ),
+        findsNWidgets(4),
+      );
       if (!large) {
-        await tester.ensureVisible(find.text('Compared with preceding period'));
+        await tester.ensureVisible(find.text('Overview'));
         await tester.pumpAndSettle();
-        await captureWidget(tester, boundary, 'insights-comparison');
+        await captureWidget(tester, boundary, 'insights-overview-comparison');
       }
       await tester.scrollUntilVisible(
         find.text('Expense purpose categories'),
@@ -169,6 +199,92 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testUi('overview handles decreases, unchanged and nonpositive baselines', (
+    tester,
+  ) async {
+    await tester.runAsync(
+      () => FinancialRecordsRepository(db).saveAll([
+        record(RecordSubtype.receiveMoney, 50, date: DateTime(2026, 9, 10)),
+        record(
+          RecordSubtype.buyGoods,
+          100,
+          fee: 0,
+          date: DateTime(2026, 9, 10),
+        ),
+        record(RecordSubtype.receiveMoney, 100, date: DateTime(2026, 8, 10)),
+        record(
+          RecordSubtype.buyGoods,
+          150,
+          fee: 0,
+          date: DateTime(2026, 8, 10),
+        ),
+      ]),
+    );
+    await open(tester);
+    final income = find.byKey(const ValueKey('insights.comparison.income'));
+    expect(
+      find.descendant(of: income, matching: find.text('-KSh 50.00')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: income, matching: find.text('50.0% less')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: income,
+        matching: find.byIcon(Icons.arrow_downward_rounded),
+      ),
+      findsOneWidget,
+    );
+    final fees = find.byKey(const ValueKey('insights.comparison.fees'));
+    final net = find.byKey(const ValueKey('insights.comparison.net cash flow'));
+    for (final metric in [fees, net]) {
+      expect(
+        find.descendant(
+          of: metric,
+          matching: find.text(
+            'Percentage unavailable (zero or negative baseline)',
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: metric,
+          matching: find.byIcon(Icons.horizontal_rule),
+        ),
+        findsOneWidget,
+      );
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  testUi('overview does not invent changes without a preceding population', (
+    tester,
+  ) async {
+    await tester.runAsync(
+      () => FinancialRecordsRepository(
+        db,
+      ).save(record(RecordSubtype.receiveMoney, 50)),
+    );
+    await open(tester);
+    expect(find.text('0 records in comparison period'), findsOneWidget);
+    expect(
+      find.text(
+        'No records in comparison period; differences are unavailable.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Comparison unavailable'), findsNWidgets(4));
+    expect(
+      find.byKey(const ValueKey('insights.comparison.income')),
+      findsNothing,
+    );
+    expect(find.text('100.0% more'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   testUi(
     'overview retains canonical fees and hidden category drill-down preserves constraints and return state',
