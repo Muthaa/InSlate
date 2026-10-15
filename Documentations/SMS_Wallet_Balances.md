@@ -1,6 +1,6 @@
 # SMS wallet balance cards
 
-The SMS balance observations screen now shows one payment-style card for each observed wallet or product and currency. Incoming balance observations update that card instead of creating another wallet card. The layout uses the InSlate navy surface with yellow/blue accents, exact recorded amounts, observation timestamps and a History action. Cards expand for larger text; the page and its controls scroll together.
+The SMS balance observations screen now shows one payment-style card for each observed wallet or product and currency. Incoming balance observations update that card instead of creating another wallet card. The layout uses a blue-to-navy gradient surface with yellow/blue accents and high-contrast light text, exact recorded amounts, observation timestamps and a History action. Cards expand for larger text; the page and its controls scroll together.
 
 ## Recorded financial meaning
 

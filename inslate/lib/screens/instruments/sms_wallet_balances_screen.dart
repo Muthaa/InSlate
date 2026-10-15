@@ -167,117 +167,133 @@ class _WalletCard extends StatelessWidget {
     final date =
         'As of ${DateFormat.yMMMd().add_jm().format(e.asOf.toLocal())}';
     return Material(
-      color: measured ? AppTheme.darkBlue : SlateColors.of(context).hero,
+      color: AppTheme.darkBlue,
       borderRadius: BorderRadius.circular(24),
       clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    measured
-                        ? Icons.account_balance_wallet_outlined
-                        : Icons.account_balance_outlined,
-                    color: measured
-                        ? SlateColors.brandYellow
-                        : SlateColors.brandBlue,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    e.subjectLabel,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
+      child: Ink(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF185C91), AppTheme.darkBlue],
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      measured
+                          ? Icons.account_balance_wallet_outlined
+                          : Icons.account_balance_outlined,
+                      color: measured
+                          ? SlateColors.brandYellow
+                          : SlateColors.brandBlue,
+                      size: 20,
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                if (measured)
-                  const Icon(
-                    Icons.contactless_outlined,
-                    color: Colors.white70,
-                    size: 24,
-                  )
-                else
-                  IconButton(
-                    key: ValueKey('sms.associate.${e.id}'),
-                    tooltip: e.accountId == null
-                        ? 'Associate latest'
-                        : 'Review association',
-                    icon: const Icon(Icons.link, color: SlateColors.brandBlue),
-                    onPressed: () => showDialog<void>(
-                      context: context,
-                      builder: (_) => SmsBalanceAssociationDialog(evidence: e),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              '${e.kind.label} · SMS-reported',
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              e.amountText,
-              key: ValueKey('sms.wallet.amount.${wallet.key}'),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 28,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.5,
-                fontFeatures: [FontFeature.tabularFigures()],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Tooltip(
-                  message: e.timeBasisLabel,
-                  child: Text(
-                    date,
-                    semanticsLabel: '$date. ${e.timeBasisLabel}',
-                    style: const TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
-                ),
-                TextButton.icon(
-                  key: ValueKey('sms.wallet.history.${wallet.key}'),
-                  style: TextButton.styleFrom(foregroundColor: Colors.white),
-                  icon: const Icon(Icons.history, size: 18),
-                  label: Text('History (${wallet.observationCount})'),
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => SmsBalanceHistoryScreen(
-                        subjectFamily: e.subjectFamily,
-                        currency: e.currency,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      e.subjectLabel,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  if (measured)
+                    const Icon(
+                      Icons.contactless_outlined,
+                      color: Color(0xFFDCEAF5),
+                      size: 24,
+                    )
+                  else
+                    IconButton(
+                      key: ValueKey('sms.associate.${e.id}'),
+                      tooltip: e.accountId == null
+                          ? 'Associate latest'
+                          : 'Review association',
+                      icon: const Icon(
+                        Icons.link,
+                        color: SlateColors.brandBlue,
+                      ),
+                      onPressed: () => showDialog<void>(
+                        context: context,
+                        builder: (_) =>
+                            SmsBalanceAssociationDialog(evidence: e),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                '${e.kind.label} · SMS-reported',
+                style: const TextStyle(color: Color(0xFFDCEAF5), fontSize: 12),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                e.amountText,
+                key: ValueKey('sms.wallet.amount.${wallet.key}'),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.5,
+                  fontFeatures: [FontFeature.tabularFigures()],
                 ),
-              ],
-            ),
-            Text(
-              measured
-                  ? 'Measured M-PESA wallet · no attribution needed'
-                  : 'Latest observation: ${e.associationLabel}',
-              style: const TextStyle(color: Colors.white, fontSize: 12),
-            ),
-          ],
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Tooltip(
+                    message: e.timeBasisLabel,
+                    child: Text(
+                      date,
+                      semanticsLabel: '$date. ${e.timeBasisLabel}',
+                      style: const TextStyle(
+                        color: Color(0xFFDCEAF5),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  TextButton.icon(
+                    key: ValueKey('sms.wallet.history.${wallet.key}'),
+                    style: TextButton.styleFrom(foregroundColor: Colors.white),
+                    icon: const Icon(Icons.history, size: 18),
+                    label: Text('History (${wallet.observationCount})'),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => SmsBalanceHistoryScreen(
+                          subjectFamily: e.subjectFamily,
+                          currency: e.currency,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                measured
+                    ? 'Measured M-PESA wallet · no attribution needed'
+                    : 'Latest observation: ${e.associationLabel}',
+                style: const TextStyle(color: Colors.white, fontSize: 12),
+              ),
+            ],
+          ),
         ),
       ),
     );
