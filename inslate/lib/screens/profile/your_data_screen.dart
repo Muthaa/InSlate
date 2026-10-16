@@ -1,5 +1,6 @@
 import 'verified_reversals_section.dart';
 import '../../widgets/app_dialog.dart';
+import '../../widgets/responsive_card_grid.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
@@ -12,6 +13,10 @@ import '../instruments/sms_balance_observations_screen.dart';
 
 class YourDataScreen extends ConsumerWidget {
   const YourDataScreen({super.key});
+  static const _deviceDataDescription =
+      'Stored locally on this device; not synchronized to an online account. '
+      'SMS storage and financial transactions are separate. Stored messages may include '
+      'failed attempts, duplicates or notifications that are not financial movements.';
   Widget _tile(
     BuildContext context,
     String title,
@@ -29,52 +34,68 @@ class YourDataScreen extends ConsumerWidget {
         : title.startsWith('Registered')
         ? Icons.account_balance_outlined
         : Icons.account_balance_wallet_outlined;
-    return Card(
-      color: Colors.white,
-      surfaceTintColor: Colors.transparent,
-      margin: const EdgeInsets.only(bottom: 10),
+    final balanceCard = title.startsWith('Balance observations');
+    final heading = Text(
+      title,
+      style: const TextStyle(
+        fontSize: 15,
+        fontWeight: FontWeight.w700,
+        color: AppTheme.darkBlue,
+      ),
+    );
+    return Material(
+      key: ValueKey('your-data.${title.split(':').first}'),
+      color: const Color(0xFFE7EEF5),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 10,
-        ),
-        leading: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: AppTheme.appBackground,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, size: 22, color: AppTheme.teal),
-        ),
-        title: Text(
-          title,
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: AppTheme.darkBlue,
-          ),
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Text(
-            detail,
-            style: TextStyle(
-              fontSize: 12,
-              height: 1.4,
-              color: Colors.grey.shade600,
-            ),
-          ),
-        ),
-        trailing: target == null
-            ? null
-            : const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
         onTap: target == null
             ? null
             : () => Navigator.push(
                 context,
                 MaterialPageRoute<void>(builder: (_) => target),
               ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.darkBlue.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, size: 20, color: AppTheme.darkBlue),
+                  ),
+                  if (balanceCard) ...[
+                    const SizedBox(width: 10),
+                    Expanded(child: heading),
+                  ] else
+                    const Spacer(),
+                  if (target != null)
+                    const Icon(
+                      Icons.arrow_outward_rounded,
+                      size: 18,
+                      color: AppTheme.darkBlue,
+                    ),
+                ],
+              ),
+              if (!balanceCard) ...[const SizedBox(height: 12), heading],
+              const SizedBox(height: 6),
+              Text(
+                detail,
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.4,
+                  color: Color(0xFF465C73),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -114,41 +135,50 @@ class YourDataScreen extends ConsumerWidget {
           children: [
             Container(
               margin: const EdgeInsets.only(bottom: 20),
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
                 color: AppTheme.darkBlue.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(18),
               ),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.phonelink_lock_outlined,
-                        color: AppTheme.darkBlue,
-                        size: 22,
-                      ),
-                      SizedBox(width: 10),
-                      Text(
-                        'Your device. Your data.',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.darkBlue,
-                        ),
-                      ),
-                    ],
+                  const Icon(
+                    Icons.phonelink_lock_outlined,
+                    color: AppTheme.darkBlue,
+                    size: 22,
                   ),
-                  SizedBox(height: 10),
-                  Text(
-                    'Stored locally on this device; not synchronized to an online account. '
-                    'SMS storage and financial transactions are separate. Stored messages may include '
-                    'failed attempts, duplicates or notifications that are not financial movements.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.4,
-                      color: Colors.blueGrey,
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'Your device. Your data.',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.darkBlue,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'About your device data',
+                    icon: const Icon(
+                      Icons.info_outline,
+                      color: AppTheme.darkBlue,
+                    ),
+                    onPressed: () => showDialog<void>(
+                      context: context,
+                      builder: (context) => AppDialog(
+                        title: const Text('Your device. Your data.'),
+                        icon: Icons.phonelink_lock_outlined,
+                        content: const SingleChildScrollView(
+                          child: Text(_deviceDataDescription),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Close'),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -180,46 +210,44 @@ class YourDataScreen extends ConsumerWidget {
                 children: [
                   _tile(
                     context,
-                    'Financial records: ${s.records}',
-                    '${s.successfulRecords} marked successful. Browse stored records by period in Activity.',
-                    const ActivityScreen(),
-                  ),
-                  _tile(
-                    context,
-                    'Raw SMS messages: ${s.messages}',
-                    'Source messages stored for parsing and provenance. Review receipt times without exposing bodies or identifiers.',
-                    const StoredSmsScreen(),
-                  ),
-                  _tile(
-                    context,
-                    'Categories: ${s.categories}',
-                    '${s.hiddenCategories} hidden; includes built-in and custom categories.',
-                  ),
-                  _tile(
-                    context,
-                    'Categorization rules: ${s.rules}',
-                    'Manage saved automatic rules in Categories.',
-                  ),
-                  _tile(
-                    context,
-                    'Registered financial instruments: ${s.activeInstruments + s.archivedInstruments}',
-                    '${s.activeInstruments} active; ${s.archivedInstruments} archived. Legacy unconfirmed accounts are excluded.',
-                  ),
-                  _tile(
-                    context,
-                    'Balance observations: ${s.balances}',
-                    '${s.manualBalances} manual; ${s.smsBalances} SMS-reported. Manage manual observations in Instrument Details.',
-                  ),
-                  _tile(
-                    context,
-                    'SMS balance observations: ${s.smsBalances}',
-                    '${s.unattributedSmsBalances} unattributed. Review associations and historical extraction.',
+                    'Balance observations: ${s.smsBalances}',
+                    'Latest recorded wallet balances and SMS history.',
                     const SmsBalanceObservationsScreen(unattributedOnly: false),
+                  ),
+                  const SizedBox(height: 12),
+                  ResponsiveCardGrid(
+                    children: [
+                      _tile(
+                        context,
+                        'Financial records: ${s.records}',
+                        '${s.successfulRecords} successful. View stored records in Activity.',
+                        const ActivityScreen(),
+                      ),
+                      _tile(
+                        context,
+                        'Raw SMS messages: ${s.messages}',
+                        'Stored source messages. Review receipt times.',
+                        const StoredSmsScreen(),
+                      ),
+                      _tile(
+                        context,
+                        'Categories & rules',
+                        '${s.categories} categories (${s.hiddenCategories} hidden); ${s.rules} categorization rules.',
+                      ),
+                      _tile(
+                        context,
+                        'Registered financial instruments: ${s.activeInstruments + s.archivedInstruments}',
+                        '${s.activeInstruments} active; ${s.archivedInstruments} archived. Registered instruments only.',
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
-            const VerifiedReversalsSection(),
+            const Padding(
+              padding: EdgeInsets.only(top: 16),
+              child: VerifiedReversalsSection(),
+            ),
             Card(
               color: Colors.white,
               margin: const EdgeInsets.only(top: 16),

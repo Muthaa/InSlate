@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../core/design/design_tokens.dart';
 import '../core/enums/account_type.dart';
 import '../core/enums/transaction_status.dart';
 import '../models/financial_records.dart';
@@ -27,10 +28,11 @@ class TransactionRow extends StatelessWidget {
       record,
       central: central,
     );
+    final palette = SlateColors.of(context);
     final color = switch (presentation.movement) {
-      MovementClass.income => const Color(0xFF0F9D8A),
-      MovementClass.expense => const Color(0xFFD95C5C),
-      _ => const Color(0xFF0B1F3A),
+      MovementClass.income => palette.income,
+      MovementClass.expense => palette.spending,
+      _ => palette.movement,
     };
     final icon = FinancialSemantics.isExpenseReversal(record)
         ? Icons.undo_rounded
@@ -77,7 +79,7 @@ class TransactionRow extends StatelessWidget {
                           style: TextStyle(
                             fontSize: nameFontSize,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF0B1F3A),
+                            color: palette.ink,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -86,7 +88,7 @@ class TransactionRow extends StatelessWidget {
                           style: TextStyle(fontSize: 12, color: color),
                         ),
                         const SizedBox(height: 4),
-                        if (!fullWidthMetadata) _metadata(),
+                        if (!fullWidthMetadata) _metadata(context),
                         if (!fullWidthMetadata &&
                             record.status != TransactionStatus.successful)
                           Text(
@@ -108,7 +110,8 @@ class TransactionRow extends StatelessWidget {
                           '${presentation.amountPrefix}${formatMoney(record.amount)}',
                           textAlign: TextAlign.end,
                           style: TextStyle(
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
+                            fontFeatures: const [FontFeature.tabularFigures()],
                             color: color,
                           ),
                         ),
@@ -119,7 +122,7 @@ class TransactionRow extends StatelessWidget {
                             textAlign: TextAlign.end,
                             style: TextStyle(
                               fontSize: 11,
-                              color: Colors.grey.shade600,
+                              color: palette.muted,
                             ),
                           ),
                         ],
@@ -133,11 +136,7 @@ class TransactionRow extends StatelessWidget {
               const SizedBox(height: 6),
               Padding(
                 padding: const EdgeInsets.only(left: 44),
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: _metadata(singleLine: true),
-                ),
+                child: _metadata(context),
               ),
               if (record.status != TransactionStatus.successful)
                 Padding(
@@ -154,14 +153,15 @@ class TransactionRow extends StatelessWidget {
     );
   }
 
-  Widget _metadata({bool singleLine = false}) {
+  Widget _metadata(BuildContext context, {bool singleLine = false}) {
+    final palette = SlateColors.of(context);
     final items = [
       Text(subtypeLabel(record.subtype)),
       Text(DateFormat.jm().format(record.transactionDate ?? record.receivedAt)),
       Text(record.reference),
     ];
     return DefaultTextStyle(
-      style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+      style: TextStyle(fontSize: 11, color: palette.muted),
       child: singleLine
           ? Row(
               mainAxisSize: MainAxisSize.min,

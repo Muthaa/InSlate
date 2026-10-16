@@ -15,6 +15,7 @@ import 'package:inslate/models/financial_period.dart';
 import 'package:inslate/models/party.dart';
 import 'package:inslate/providers/financial_summary_provider.dart';
 import 'package:inslate/providers/dashboard_provider.dart';
+import 'package:inslate/providers/database_provider.dart';
 import 'package:inslate/providers/activity_provider.dart';
 import 'package:inslate/providers/repository_providers.dart';
 import 'package:inslate/screens/activity/activity_screen.dart';
@@ -49,6 +50,7 @@ void main() {
     ]);
     container = ProviderContainer(
       overrides: [
+        databaseProvider.overrideWithValue(database),
         financialRecordsRepositoryProvider.overrideWithValue(repository),
       ],
     );
@@ -223,10 +225,11 @@ void main() {
     (tester) async {
       await open(tester);
       expect(repository.periodReads, 1);
+      expect(find.text('Purpose unspecified'), findsNothing);
       expect(find.text('Into M-PESA'), findsOneWidget);
       expect(find.text('From M-PESA'), findsOneWidget);
       await tester.scrollUntilVisible(
-        find.text('Expenses'),
+        find.text('Expense categories'),
         250,
         scrollable: find
             .byWidgetPredicate(
@@ -236,7 +239,10 @@ void main() {
       );
       await tester.pumpAndSettle();
       final expenses = find
-          .ancestor(of: find.text('Expenses'), matching: find.byType(Row))
+          .ancestor(
+            of: find.text('Expense categories'),
+            matching: find.byType(Row),
+          )
           .first;
       expect(
         find.descendant(of: expenses, matching: find.text('KSh 500.00')),
@@ -266,7 +272,7 @@ void main() {
     'spending follows breakdown then subtype Activity with snapshot period',
     (tester) async {
       await open(tester);
-      await tapVisible(tester, find.text('Expense transaction types'));
+      await tapVisible(tester, find.text('Expense categories'));
       expect(find.byType(FinancialBreakdownScreen), findsOneWidget);
       expect(find.byType(ActivityScreen), findsNothing);
       container.read(selectedMonthProvider.notifier).state = DateTime(2026, 8);
@@ -456,6 +462,7 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).first,
     );
+    await tester.pumpAndSettle();
     expect(tester.getTopLeft(purchases).dy, tester.getTopLeft(redemptions).dy);
     expect(tester.getTopLeft(deposits).dy, tester.getTopLeft(withdrawals).dy);
     expect(
@@ -715,7 +722,9 @@ void main() {
             kind == BreakdownKind.internalMovement
                 ? 'Total internal movement'
                 : kind == BreakdownKind.loans
-                ? 'Total loan activity'
+                ? 'Loan activity'
+                : kind == BreakdownKind.investmentsAndSavings
+                ? 'Savings & investment activity'
                 : 'Total contributions & withdrawals',
           ),
           findsOneWidget,
@@ -739,7 +748,7 @@ void main() {
     repository.fail = false;
     await tester.tap(find.text('Retry'));
     await tester.pumpAndSettle();
-    await tapVisible(tester, find.text('Expense transaction types'));
+    await tapVisible(tester, find.text('Expense categories'));
     expect(find.text('Expense categories'), findsOneWidget);
   });
 

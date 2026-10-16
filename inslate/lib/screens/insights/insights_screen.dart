@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/design/design_tokens.dart';
 import '../../core/presentation/financial_presentation.dart';
 import '../../models/activity_filter.dart';
 import '../../models/financial_period.dart';
@@ -9,6 +10,7 @@ import '../../providers/insights_provider.dart';
 import '../../providers/repository_providers.dart';
 import '../activity/activity_screen.dart';
 import 'insight_trend_chart.dart';
+import 'insight_category_donut.dart';
 import '../../widgets/app_dialog.dart';
 import '../../widgets/unspecified_movements_card.dart';
 
@@ -153,6 +155,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     IconData? icon,
     Color? accent,
     Widget? action,
+    String? subtitle,
+    bool compact = false,
   }) => Card(
     color: Colors.white,
     surfaceTintColor: Colors.transparent,
@@ -164,16 +168,32 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
           Row(
             children: [
               if (icon != null) ...[
-                Icon(icon, color: accent, size: 22),
+                Icon(icon, color: accent, size: compact ? 19 : 22),
                 const SizedBox(width: 10),
               ],
               Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: compact ? 16 : 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.blueGrey.shade700,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               ?action,
@@ -186,7 +206,13 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     ),
   );
 
-  Widget _metric(String label, double value, {ActivityFilter? filter}) {
+  Widget _metric(
+    String label,
+    double value,
+    double previous, {
+    required bool comparisonAvailable,
+    ActivityFilter? filter,
+  }) {
     final accent = switch (label) {
       'Income' => AppTheme.teal,
       'Expenses' => Colors.red.shade700,
@@ -199,72 +225,118 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
       'Fees' => Icons.receipt_outlined,
       _ => Icons.swap_vert,
     };
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final compact =
-                constraints.maxWidth < 400 ||
-                MediaQuery.textScalerOf(context).scale(14) > 18;
-            final amount = Text(
-              formatMoney(value),
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: accent,
+    final subject = switch (label) {
+      'Income' => 'income',
+      'Expenses' => 'spending',
+      'Fees' => 'fees',
+      _ => 'net cash flow',
+    };
+    final change = InsightChange(value, previous);
+    final percentageLabel = change.percentage == null
+        ? 'Percentage unavailable (zero or negative baseline)'
+        : change.percentage == 0
+        ? 'No change in $subject'
+        : '${change.percentage!.abs().toStringAsFixed(1)}% ${change.percentage! < 0 ? 'less' : 'more'}';
+    final direction = change.absolute == 0
+        ? Icons.horizontal_rule
+        : change.absolute > 0
+        ? Icons.arrow_upward_rounded
+        : Icons.arrow_downward_rounded;
+    final palette = SlateColors.of(context);
+    final changeColor = palette.muted;
+    final lowerIsFavorable = label == 'Expenses' || label == 'Fees';
+    final favorable = lowerIsFavorable
+        ? change.absolute < 0
+        : change.absolute > 0;
+    final percentageColor =
+        !comparisonAvailable ||
+            change.percentage == null ||
+            change.absolute == 0
+        ? palette.muted
+        : favorable
+        ? palette.income
+        : palette.spending;
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      child: ListTile(
+        dense: true,
+        minVerticalPadding: 8,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+        title: Row(
+          children: [
+            Icon(icon, color: accent, size: 18),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            );
-            return ListTile(
-              dense: true,
-              visualDensity: const VisualDensity(vertical: -2),
-              minVerticalPadding: 4,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+            ),
+            if (filter != null)
+              const Icon(Icons.chevron_right, size: 18, color: Colors.grey),
+          ],
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 6),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                formatMoney(value),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: accent,
+                ),
               ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 0,
-              ),
-              title: Row(
+            ),
+            const SizedBox(height: 10),
+            if (comparisonAvailable)
+              Column(
+                key: ValueKey('insights.comparison.$subject'),
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(icon, color: accent, size: 18),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      label,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  Text(
+                    '${change.absolute > 0 ? '+' : ''}${formatMoney(change.absolute)}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: changeColor,
                     ),
                   ),
-                ],
-              ),
-              subtitle: compact
-                  ? Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: FittedBox(fit: BoxFit.scaleDown, child: amount),
+                  const SizedBox(height: 4),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(direction, size: 16, color: percentageColor),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          percentageLabel,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: percentageColor,
+                          ),
+                        ),
                       ),
-                    )
-                  : null,
-              trailing: compact
-                  ? (filter == null
-                        ? null
-                        : const Icon(
-                            Icons.chevron_right,
-                            size: 20,
-                            color: Colors.grey,
-                          ))
-                  : amount,
-              onTap: filter == null ? null : () => _open(filter),
-            );
-          },
+                    ],
+                  ),
+                ],
+              )
+            else
+              Text(
+                'Comparison unavailable',
+                style: TextStyle(fontSize: 12, color: changeColor),
+              ),
+          ],
         ),
+        onTap: filter == null ? null : () => _open(filter),
       ),
     );
   }
@@ -275,306 +347,44 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     bool expense = false,
   }) {
     final accent = expense ? Colors.red.shade700 : AppTheme.teal;
-    final icon = expense
-        ? Icons.remove_circle_outline
-        : Icons.add_circle_outline;
     return Padding(
       padding: const EdgeInsets.only(top: 16),
       child: _section(
         expense ? 'Expense purpose categories' : 'Income purpose categories',
         [
-          if (groups.isEmpty)
-            Text(
-              expense
-                  ? 'No ordinary expenses in this period.'
-                  : 'No ordinary income in this period.',
-            ),
-          for (final group in groups)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Material(
-                color: AppTheme.appBackground,
-                borderRadius: BorderRadius.circular(14),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(14),
-                  key: ValueKey(
-                    'insights.category.${expense ? 'expenses' : 'income'}.${group.id ?? 'uncategorized'}',
-                  ),
-                  onTap: () => _open(group.filter),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: accent.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Icon(icon, size: 20, color: accent),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                '${group.name}${group.hidden ? ' (hidden)' : ''}',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.darkBlue,
-                                ),
-                              ),
-                            ),
-                            Icon(
-                              Icons.chevron_right,
-                              size: 20,
-                              color: Colors.grey,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 6,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            Text(
-                              formatMoney(group.amount),
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: accent,
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                group.share(total) == null
-                                    ? (expense
-                                          ? (total == 0
-                                                ? 'Share unavailable (zero total)'
-                                                : 'Share unavailable (negative net total)')
-                                          : 'Share unavailable')
-                                    : '${(group.share(total)! * 100).toStringAsFixed(1)}%',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppTheme.darkBlue,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              '${group.count} ${group.count == 1 ? 'transaction' : 'transactions'}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (group.amount >= 0 && total > 0) ...[
-                          const SizedBox(height: 10),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              minHeight: 5,
-                              value: (group.share(total) ?? 0).clamp(0, 1),
-                              color: accent,
-                              backgroundColor: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
+          InsightCategoryDonut(
+            groups: groups,
+            total: total,
+            expense: expense,
+            onOpen: _open,
+          ),
         ],
-        icon: icon,
+        compact: true,
+        icon: expense ? Icons.remove_circle_outline : Icons.add_circle_outline,
         accent: accent,
       ),
     );
   }
 
-  Widget _comparison(InsightsSummary s) {
-    Widget changeRow(
-      String label,
-      double current,
-      double previous,
-      IconData icon,
-      Color accent,
-    ) {
-      final change = InsightChange(current, previous);
-      final subject = switch (label) {
-        'Income' => 'income',
-        'Expenses' => 'spending',
-        'Fees' => 'fees',
-        _ => 'net cash flow',
-      };
-      final percentageLabel = change.percentage == null
-          ? 'percentage unavailable (zero or negative baseline)'
-          : change.percentage == 0
-          ? 'No change in $subject'
-          : '${change.percentage!.abs().toStringAsFixed(1)}% ${change.percentage! < 0 ? 'less' : 'more'}';
-      final color = change.absolute == 0 ? Colors.grey.shade600 : accent;
-      return Container(
-        margin: const EdgeInsets.only(top: 8),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: accent.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, size: 20, color: accent),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ),
-                Icon(
-                  change.absolute == 0
-                      ? Icons.horizontal_rule
-                      : change.absolute > 0
-                      ? Icons.trending_up
-                      : Icons.trending_down,
-                  size: 20,
-                  color: color,
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 10,
-              runSpacing: 6,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Text(
-                  '${change.absolute > 0 ? '+' : ''}${formatMoney(change.absolute)}',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: color,
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    percentageLabel,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: color,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 16),
-      child: _section(
-        'Compared with preceding period',
-        [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppTheme.darkBlue.withValues(alpha: 0.04),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  periodLabel(s.comparisonPeriod),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.darkBlue,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${s.previousRecordCount} records in comparison period',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                ),
-              ],
-            ),
-          ),
-          if (s.recordCount == 0)
-            const Padding(
-              padding: EdgeInsets.only(top: 12),
-              child: Text(
-                'No records in selected period; differences are unavailable.',
-              ),
-            )
-          else if (s.previousRecordCount == 0)
-            const Padding(
-              padding: EdgeInsets.only(top: 12),
-              child: Text(
-                'No records in comparison period; differences are unavailable.',
-              ),
-            )
-          else ...[
-            changeRow(
-              'Income',
-              s.totals.income,
-              s.previousTotals.income,
-              Icons.add_circle_outline,
-              AppTheme.teal,
-            ),
-            changeRow(
-              'Expenses',
-              s.totals.expenses,
-              s.previousTotals.expenses,
-              Icons.remove_circle_outline,
-              Colors.red.shade700,
-            ),
-            changeRow(
-              'Fees',
-              s.totals.fees,
-              s.previousTotals.fees,
-              Icons.receipt_outlined,
-              Colors.amber.shade800,
-            ),
-            changeRow(
-              'Net cash flow',
-              s.totals.netCashFlow,
-              s.previousTotals.netCashFlow,
-              Icons.swap_vert,
-              Colors.blue.shade700,
-            ),
-          ],
+  Widget _comparisonPair(Widget first, Widget second) => LayoutBuilder(
+    builder: (context, constraints) {
+      if (constraints.maxWidth < 280 ||
+          MediaQuery.textScalerOf(context).scale(16) > 22) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [first, const SizedBox(height: 8), second],
+        );
+      }
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: first),
+          const SizedBox(width: 12),
+          Expanded(child: second),
         ],
-        icon: Icons.compare_arrows,
-        accent: AppTheme.darkBlue,
-      ),
-    );
-  }
+      );
+    },
+  );
 
   Widget _trends(InsightsSummary s) => Padding(
     padding: const EdgeInsets.only(top: 16),
@@ -792,42 +602,93 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                 _section(
                   'Overview',
                   [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: _metric(
-                            'Income',
-                            s.totals.income,
-                            filter: s.filter(ActivityScope.income),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.darkBlue.withValues(alpha: 0.04),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Selected period: ${periodLabel(s.period)}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Comparison period: ${periodLabel(s.comparisonPeriod)}',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${s.previousRecordCount} records in comparison period',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.blueGrey.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (s.recordCount == 0 || s.previousRecordCount == 0)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Text(
+                          s.recordCount == 0
+                              ? 'No records in selected period; differences are unavailable.'
+                              : 'No records in comparison period; differences are unavailable.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.blueGrey.shade700,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _metric(
-                            'Expenses',
-                            s.totals.expenses,
-                            filter: s.filter(ActivityScope.expenses),
-                          ),
-                        ),
-                      ],
+                      ),
+                    const SizedBox(height: 12),
+                    _comparisonPair(
+                      _metric(
+                        'Income',
+                        s.totals.income,
+                        s.previousTotals.income,
+                        comparisonAvailable:
+                            s.recordCount > 0 && s.previousRecordCount > 0,
+                        filter: s.filter(ActivityScope.income),
+                      ),
+                      _metric(
+                        'Expenses',
+                        s.totals.expenses,
+                        s.previousTotals.expenses,
+                        comparisonAvailable:
+                            s.recordCount > 0 && s.previousRecordCount > 0,
+                        filter: s.filter(ActivityScope.expenses),
+                      ),
                     ),
                     const Divider(height: 24),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: _metric('Fees', s.totals.fees)),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _metric('Net cash flow', s.totals.netCashFlow),
-                        ),
-                      ],
+                    _comparisonPair(
+                      _metric(
+                        'Fees',
+                        s.totals.fees,
+                        s.previousTotals.fees,
+                        comparisonAvailable:
+                            s.recordCount > 0 && s.previousRecordCount > 0,
+                      ),
+                      _metric(
+                        'Net cash flow',
+                        s.totals.netCashFlow,
+                        s.previousTotals.netCashFlow,
+                        comparisonAvailable:
+                            s.recordCount > 0 && s.previousRecordCount > 0,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        '${s.recordCount} financial records in this period',
+                        '${s.recordCount} financial records in selected period',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey.shade600,
@@ -835,6 +696,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                       ),
                     ),
                   ],
+                  subtitle: 'Compared with preceding period',
                   icon: Icons.account_balance_wallet_outlined,
                   accent: AppTheme.darkBlue,
                   action: IconButton(
@@ -858,15 +720,17 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                     ),
                   ),
                 ),
-                _comparison(s),
-                UnspecifiedMovementsCard(period: s.period),
+                if (s.recordCount > 0) _trends(s),
                 _purposeCategories(
                   s.expenseCategories,
                   s.totals.expenses,
                   expense: true,
                 ),
                 _purposeCategories(s.incomeCategories, s.totals.income),
-                if (s.recordCount > 0) _trends(s),
+                Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: UnspecifiedMovementsCard(period: s.period),
+                ),
               ],
             ),
           ),

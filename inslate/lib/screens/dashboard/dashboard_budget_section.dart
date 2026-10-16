@@ -65,12 +65,21 @@ class DashboardBudgetSection extends ConsumerWidget {
               ),
               open('View current-month budgets'),
             ] else ...[
-              Row(
-                children: [
-                  Expanded(child: Text(periodLabel(period))),
-                  open('Manage budgets'),
-                ],
-              ),
+              MediaQuery.textScalerOf(context).scale(14) > 14
+                  ? Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
+                      children: [
+                        Text(periodLabel(period)),
+                        open('Manage budgets'),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        Expanded(child: Text(periodLabel(period))),
+                        open('Manage budgets'),
+                      ],
+                    ),
               ref
                   .watch(budgetsProvider(period))
                   .when(
@@ -100,106 +109,140 @@ class DashboardBudgetSection extends ConsumerWidget {
                           'No active budgets. Create or resume a monthly target.',
                         );
                       }
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          for (final p in active.take(3))
-                            Container(
-                              margin: const EdgeInsets.only(top: 12),
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: AppTheme.appBackground,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: Colors.grey.shade200),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                      return LayoutBuilder(
+                        builder: (context, constraints) {
+                          final cardWidth = constraints.maxWidth < 360
+                              ? constraints.maxWidth * 0.88
+                              : 320.0;
+                          return SingleChildScrollView(
+                            key: const ValueKey('dashboard.budget.scroller'),
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.only(top: 12),
+                            child: IntrinsicHeight(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  Text(
-                                    '${p.budget.label}${p.budget.categoryHidden ? ' (hidden)' : ''}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      color: AppTheme.darkBlue,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    'Target ${formatKesMinor(BigInt.from(p.budget.amountMinor))}',
-                                    style: Theme.of(context).textTheme.bodySmall
-                                        ?.copyWith(color: Colors.grey.shade600),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  if (p.spentMinor == null)
-                                    const Text(
-                                      'Spending unavailable; recorded precision is unsupported.',
-                                    )
-                                  else ...[
-                                    Wrap(
-                                      spacing: 12,
-                                      runSpacing: 4,
-                                      children: [
-                                        Text(
-                                          'Spent ${formatKesMinor(p.spentMinor!)}',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                          ),
+                                  for (final p in active)
+                                    Container(
+                                      key: ValueKey(
+                                        'dashboard.budget.${p.budget.id}',
+                                      ),
+                                      width: cardWidth,
+                                      margin: const EdgeInsetsDirectional.only(
+                                        end: 12,
+                                      ),
+                                      padding: const EdgeInsets.all(14),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.appBackground,
+                                        borderRadius: BorderRadius.circular(14),
+                                        border: Border.all(
+                                          color: Colors.grey.shade200,
                                         ),
-                                        Text(
-                                          '${p.usedPercentage} used',
-                                          style: TextStyle(
-                                            color:
-                                                p.overspentMinor! > BigInt.zero
-                                                ? Colors.deepOrange
-                                                : AppTheme.teal,
-                                            fontWeight: FontWeight.w600,
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '${p.budget.label}${p.budget.categoryHidden ? ' (hidden)' : ''}',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              color: AppTheme.darkBlue,
+                                            ),
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    LinearProgressIndicator(
-                                      value: p.usedBasisPoints! < BigInt.zero
-                                          ? 0
-                                          : p.usedBasisPoints! >
-                                                BigInt.from(10000)
-                                          ? 1
-                                          : p.usedBasisPoints!.toInt() / 10000,
-                                      minHeight: 6,
-                                      borderRadius: BorderRadius.circular(6),
-                                      color: p.overspentMinor! > BigInt.zero
-                                          ? Colors.deepOrange
-                                          : AppTheme.teal,
-                                      backgroundColor: Colors.grey.shade200,
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Text(
-                                      p.overspentMinor! > BigInt.zero
-                                          ? 'Over budget by ${formatKesMinor(p.overspentMinor!)}'
-                                          : 'Remaining ${formatKesMinor(p.remainingMinor!)}',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                            color:
-                                                p.overspentMinor! > BigInt.zero
-                                                ? Colors.deepOrange
-                                                : Colors.grey.shade700,
-                                            fontWeight: FontWeight.w600,
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            'Target ${formatKesMinor(BigInt.from(p.budget.amountMinor))}',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodySmall
+                                                ?.copyWith(
+                                                  color: Colors.grey.shade600,
+                                                ),
                                           ),
+                                          const SizedBox(height: 12),
+                                          if (p.spentMinor == null)
+                                            const Text(
+                                              'Spending unavailable; recorded precision is unsupported.',
+                                            )
+                                          else ...[
+                                            Wrap(
+                                              spacing: 12,
+                                              runSpacing: 4,
+                                              children: [
+                                                Text(
+                                                  'Spent ${formatKesMinor(p.spentMinor!)}',
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  '${p.usedPercentage} used',
+                                                  style: TextStyle(
+                                                    color:
+                                                        p.overspentMinor! >
+                                                            BigInt.zero
+                                                        ? Colors.deepOrange
+                                                        : AppTheme.teal,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 10),
+                                            LinearProgressIndicator(
+                                              value:
+                                                  p.usedBasisPoints! <
+                                                      BigInt.zero
+                                                  ? 0
+                                                  : p.usedBasisPoints! >
+                                                        BigInt.from(10000)
+                                                  ? 1
+                                                  : p.usedBasisPoints!.toInt() /
+                                                        10000,
+                                              minHeight: 6,
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                              color:
+                                                  p.overspentMinor! >
+                                                      BigInt.zero
+                                                  ? Colors.deepOrange
+                                                  : AppTheme.teal,
+                                              backgroundColor:
+                                                  Colors.grey.shade200,
+                                            ),
+                                            const SizedBox(height: 10),
+                                            Text(
+                                              p.overspentMinor! > BigInt.zero
+                                                  ? 'Over budget by ${formatKesMinor(p.overspentMinor!)}'
+                                                  : 'Remaining ${formatKesMinor(p.remainingMinor!)}',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.copyWith(
+                                                    color:
+                                                        p.overspentMinor! >
+                                                            BigInt.zero
+                                                        ? Colors.deepOrange
+                                                        : Colors.grey.shade700,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                            ),
+                                            if (p.count == 0) ...[
+                                              const SizedBox(height: 4),
+                                              const Text(
+                                                'No spending recorded.',
+                                              ),
+                                            ],
+                                          ],
+                                        ],
+                                      ),
                                     ),
-                                    if (p.count == 0) ...[
-                                      const SizedBox(height: 4),
-                                      const Text('No spending recorded.'),
-                                    ],
-                                  ],
                                 ],
                               ),
                             ),
-                          if (active.length > 3)
-                            Text(
-                              '${active.length - 3} more active targets in Budgets',
-                            ),
-                        ],
+                          );
+                        },
                       );
                     },
                   ),

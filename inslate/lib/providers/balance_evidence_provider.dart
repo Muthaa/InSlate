@@ -1,3 +1,4 @@
+import '../core/enums/account_type.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/balance_observation.dart';
 import '../repositories/balance_evidence_repository.dart';
@@ -32,5 +33,28 @@ final smsBalanceHistoryProvider = FutureProvider.autoDispose
           .smsHistory(
             unattributedOnly: query.unattributedOnly,
             page: query.page,
+          );
+    });
+
+final smsWalletBalancesProvider =
+    FutureProvider.autoDispose<List<SmsWalletBalance>>((ref) {
+      ref.watch(_balanceRevisionProvider.select((v) => v.valueOrNull ?? 0));
+      return ref.watch(balanceEvidenceRepositoryProvider).smsWallets();
+    });
+typedef SmsWalletHistoryQuery = ({
+  AccountType family,
+  String currency,
+  int page,
+});
+final smsWalletHistoryProvider = FutureProvider.autoDispose
+    .family<BalanceHistoryPage, SmsWalletHistoryQuery>((ref, query) {
+      ref.watch(_balanceRevisionProvider.select((v) => v.valueOrNull ?? 0));
+      return ref
+          .watch(balanceEvidenceRepositoryProvider)
+          .smsHistory(
+            unattributedOnly: false,
+            page: query.page,
+            subjectFamily: query.family,
+            currency: query.currency,
           );
     });

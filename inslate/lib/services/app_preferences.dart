@@ -15,12 +15,26 @@ class AppPreferences {
     return LocalAvatar.values
             .where((value) => value.name == saved)
             .firstOrNull ??
-        LocalAvatar.robot;
+        LocalAvatar.astronaut;
   }
 
   Future<void> setLocalAvatar(LocalAvatar avatar) async {
     if (!await _preferences.setString('local_avatar', avatar.name)) {
       throw StateError('Unable to save avatar.');
+    }
+  }
+
+  bool get reduceMotion => _preferences.getBool('reduce_motion') ?? false;
+  Future<void> setReduceMotion(bool enabled) async {
+    if (!await _preferences.setBool('reduce_motion', enabled)) {
+      throw StateError('Unable to save appearance preference.');
+    }
+  }
+
+  bool get appLockEnabled => _preferences.getBool('app_lock_enabled') ?? false;
+  Future<void> setAppLockEnabled(bool enabled) async {
+    if (!await _preferences.setBool('app_lock_enabled', enabled)) {
+      throw StateError('Unable to save app lock preference.');
     }
   }
 
