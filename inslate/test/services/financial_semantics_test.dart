@@ -40,6 +40,7 @@ void main() {
       RecordSubtype.deposit: MovementClass.income,
       RecordSubtype.buyGoods: MovementClass.expense,
       RecordSubtype.payBill: MovementClass.expense,
+      RecordSubtype.payBillReversal: MovementClass.expense,
       RecordSubtype.mshwariDeposit: MovementClass.internalTransfer,
       RecordSubtype.mshwariWithdrawal: MovementClass.internalTransfer,
       RecordSubtype.kcbDeposit: MovementClass.internalTransfer,
@@ -56,6 +57,10 @@ void main() {
       RecordSubtype.savingsWithdrawal: MovementClass.unresolved,
       RecordSubtype.billPayment: MovementClass.unresolved,
       RecordSubtype.unknown: MovementClass.unresolved,
+      RecordSubtype.registeredSavingsDeposit: MovementClass.internalTransfer,
+      RecordSubtype.registeredSavingsWithdrawal: MovementClass.internalTransfer,
+      RecordSubtype.instrumentPayment: MovementClass.unresolved,
+      RecordSubtype.instrumentReceipt: MovementClass.unresolved,
     };
     expect(expected.keys.toSet(), RecordSubtype.values.toSet());
     for (final entry in expected.entries) {

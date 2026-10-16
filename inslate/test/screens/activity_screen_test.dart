@@ -181,19 +181,23 @@ void main() {
         record(RecordSubtype.sendMoney, i.toDouble()),
     ];
     await open(tester);
-    await tester.tap(find.text('Next'));
+    await tester.tap(find.byTooltip('Next page'));
     await tester.pumpAndSettle();
-    expect(find.text('Page 2'), findsOneWidget);
+    expect(find.text('2 of 2'), findsOneWidget);
     expect(find.text('−KSh 54.00'), findsOneWidget);
     expect(
       tester
-          .widget<TextButton>(find.widgetWithText(TextButton, 'Next'))
+          .widget<IconButton>(
+            find.byWidgetPredicate(
+              (widget) => widget is IconButton && widget.tooltip == 'Next page',
+            ),
+          )
           .onPressed,
       isNull,
     );
     await tester.tap(find.byTooltip('Refresh activity'));
     await tester.pumpAndSettle();
-    expect(find.text('Page 1'), findsOneWidget);
+    expect(find.text('1 of 2'), findsOneWidget);
   });
 
   testWidgets('initial typed transfer drill-down works and can clear filters', (
@@ -247,10 +251,10 @@ void main() {
       ];
       await open(tester);
       expect(find.text('123 transactions'), findsOneWidget);
-      expect(find.text('of 3 · Jump'), findsOneWidget);
+      expect(find.text('1 of 3'), findsOneWidget);
       await tester.tap(find.byTooltip('Last page'));
       await tester.pumpAndSettle();
-      expect(find.text('Page 3'), findsOneWidget);
+      expect(find.text('3 of 3'), findsOneWidget);
       expect(
         tester
             .widget<IconButton>(
@@ -264,8 +268,8 @@ void main() {
       );
       await tester.tap(find.byTooltip('First page'));
       await tester.pumpAndSettle();
-      expect(find.text('Page 1'), findsOneWidget);
-      await tester.tap(find.text('of 3 · Jump'));
+      expect(find.text('1 of 3'), findsOneWidget);
+      await tester.tap(find.text('1 of 3'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextFormField), '4');
       await tester.tap(find.text('Go'));
@@ -274,11 +278,11 @@ void main() {
       await tester.enterText(find.byType(TextFormField), '2');
       await tester.tap(find.text('Go'));
       await tester.pumpAndSettle();
-      expect(find.text('Page 2'), findsOneWidget);
+      expect(find.text('2 of 3'), findsOneWidget);
       await tester.tap(find.widgetWithText(ChoiceChip, 'Income'));
       await tester.pumpAndSettle();
       expect(find.text('0 transactions · 0 pages'), findsOneWidget);
-      expect(find.text('No pages'), findsOneWidget);
+      expect(find.text('0 of 0'), findsOneWidget);
     },
   );
 
@@ -313,6 +317,27 @@ void main() {
         repository.lastFilter!.period.end,
         DateTime(today.year, today.month, today.day + 1),
       );
+      expect(repository.lastFilter!.scope, ActivityScope.loans);
+      for (final days in [60, 90]) {
+        await tester.tap(find.byTooltip('Choose date range'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Last $days days'));
+        await tester.pumpAndSettle();
+        expect(
+          repository.lastFilter!.period.start,
+          DateTime(today.year, today.month, today.day - days + 1),
+        );
+        expect(
+          repository.lastFilter!.period.end,
+          DateTime(today.year, today.month, today.day + 1),
+        );
+        expect(repository.lastFilter!.scope, ActivityScope.loans);
+      }
+      await tester.tap(find.byTooltip('Choose date range'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('All time'));
+      await tester.pumpAndSettle();
+      expect(repository.lastFilter!.period, FinancialPeriod.allTime());
       expect(repository.lastFilter!.scope, ActivityScope.loans);
     },
   );

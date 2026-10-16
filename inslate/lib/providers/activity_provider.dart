@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:drift/drift.dart' show TableUpdateQuery;
 import '../models/activity_filter.dart';
 import '../models/financial_records.dart';
 import 'repository_providers.dart';
@@ -24,6 +25,11 @@ class ActivityPage {
 final activityPageProvider = FutureProvider.autoDispose
     .family<ActivityPage, ActivityPageQuery>((ref, query) async {
       ref.watch(financialDataRevisionProvider);
+      if (query.filter.category != null) {
+        ref.watch(
+          activityCategoryRevisionProvider.select((v) => v.valueOrNull ?? 0),
+        );
+      }
       final records = await ref
           .watch(financialRecordsRepositoryProvider)
           .getActivity(
@@ -42,7 +48,27 @@ final activityMonthsProvider = FutureProvider.autoDispose<Set<DateTime>>((ref) {
 final activityCountProvider = FutureProvider.autoDispose
     .family<int, ActivityFilter>((ref, filter) {
       ref.watch(financialDataRevisionProvider);
+      if (filter.category != null) {
+        ref.watch(
+          activityCategoryRevisionProvider.select((v) => v.valueOrNull ?? 0),
+        );
+      }
       return ref
           .watch(financialRecordsRepositoryProvider)
           .countActivity(filter);
     });
+
+// Observe table invalidations, without selecting every assignment or reloading
+// financial history. Only category-filtered queries depend on this revision.
+final activityCategoryRevisionProvider = StreamProvider.autoDispose<int>((
+  ref,
+) async* {
+  final db = ref.watch(financialRecordsRepositoryProvider).database;
+  var revision = 0;
+  yield revision;
+  await for (final _ in db.tableUpdates(
+    TableUpdateQuery.onTable(db.recordCategoryAssignments),
+  )) {
+    yield ++revision;
+  }
+});

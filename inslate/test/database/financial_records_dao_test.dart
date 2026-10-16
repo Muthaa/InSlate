@@ -110,6 +110,9 @@ void main() {
               'SMS-RAW-EXISTING', 'MPESA', 'Existing raw SMS', 1790934897
             );
           ''');
+            db.execute(
+              "CREATE TABLE accounts (id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, uuid TEXT NOT NULL UNIQUE, name TEXT NOT NULL, type TEXT NOT NULL, institution TEXT NULL, is_active INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL DEFAULT (strftime('%s', CURRENT_TIMESTAMP)))",
+            );
             db.execute('PRAGMA user_version = 2;');
           },
         ),

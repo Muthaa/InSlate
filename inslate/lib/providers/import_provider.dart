@@ -69,11 +69,15 @@ class ImportNotifier extends Notifier<ImportProgress> {
 
       state = ImportProgress(
         status: ImportStatus.completed,
-        total: result.imported + result.skipped + result.failed,
-        processed: result.imported + result.skipped + result.failed,
+        total: result.total,
+        processed: result.total,
         imported: result.imported,
         skipped: result.skipped,
+        duplicate: result.duplicate,
         failed: result.failed,
+        rawCreated: result.rawCreated,
+        evidenceCreated: result.evidenceCreated,
+        reasons: result.reasons,
       );
     } catch (e) {
       state = ImportProgress(status: ImportStatus.failed, error: e.toString());
@@ -114,6 +118,7 @@ class ImportNotifier extends Notifier<ImportProgress> {
         'SMS CATCH-UP COMPLETE: '
         '${result.imported} imported, '
         '${result.skipped} skipped, '
+        '${result.duplicate} duplicate, '
         '${result.failed} failed',
       );
 

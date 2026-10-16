@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import '../core/design/design_tokens.dart';
 import '../core/theme/app_theme.dart';
 import 'dashboard/dashboard_screen.dart';
+import 'profile/profile_overview_screen.dart';
+import 'insights/insights_screen.dart';
 import 'activity/activity_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/import_provider.dart';
@@ -17,12 +20,27 @@ class _AppShellState extends ConsumerState<AppShell>
   int _currentIndex = 0;
 
   bool _activityInitialized = false;
-  final List<Widget> _screens = [
-    const DashboardScreen(),
+  bool _insightsInitialized = false;
+  late final List<Widget> _screens = [
+    DashboardScreen(onOpenProfile: () => _selectTab(3)),
     const SizedBox.shrink(),
-    const _PlaceholderScreen(title: 'Insights', icon: Icons.insights_rounded),
-    const _PlaceholderScreen(title: 'More', icon: Icons.more_horiz_rounded),
+    const SizedBox.shrink(),
+    const ProfileOverviewScreen(),
   ];
+
+  void _selectTab(int index) {
+    setState(() {
+      if (index == 1 && !_activityInitialized) {
+        _screens[1] = const ActivityScreen();
+        _activityInitialized = true;
+      }
+      if (index == 2 && !_insightsInitialized) {
+        _screens[2] = const InsightsScreen();
+        _insightsInitialized = true;
+      }
+      _currentIndex = index;
+    });
+  }
 
   @override
   void initState() {
@@ -56,69 +74,63 @@ class _AppShellState extends ConsumerState<AppShell>
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFE8ECEF), width: 1)),
+        decoration: BoxDecoration(
+          color: AppTheme.darkBlue,
+          border: Border(top: BorderSide(color: Colors.white12)),
         ),
-        child: NavigationBar(
-          backgroundColor: Colors.white,
-          elevation: 0,
-          height: 72,
-          selectedIndex: _currentIndex,
-          onDestinationSelected: (index) {
-            setState(() {
-              if (index == 1 && !_activityInitialized) {
-                _screens[1] = const ActivityScreen();
-                _activityInitialized = true;
-              }
-              _currentIndex = index;
-            });
-          },
-          indicatorColor: AppTheme.teal.withValues(alpha: 0.12),
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.dashboard_outlined),
-              selectedIcon: Icon(Icons.dashboard_rounded),
-              label: 'Home',
+        child: NavigationBarTheme(
+          data: NavigationBarThemeData(
+            iconTheme: WidgetStateProperty.resolveWith(
+              (states) => IconThemeData(
+                color: states.contains(WidgetState.selected)
+                    ? SlateColors.brandYellow
+                    : Colors.white70,
+              ),
             ),
-            NavigationDestination(
-              icon: Icon(Icons.receipt_long_outlined),
-              selectedIcon: Icon(Icons.receipt_long_rounded),
-              label: 'Activity',
+            labelTextStyle: WidgetStateProperty.resolveWith(
+              (states) => TextStyle(
+                fontSize: 12,
+                fontWeight: states.contains(WidgetState.selected)
+                    ? FontWeight.w700
+                    : FontWeight.w500,
+                color: states.contains(WidgetState.selected)
+                    ? Colors.white
+                    : Colors.white70,
+              ),
             ),
-            NavigationDestination(
-              icon: Icon(Icons.insights_outlined),
-              selectedIcon: Icon(Icons.insights_rounded),
-              label: 'Insights',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.more_horiz_outlined),
-              selectedIcon: Icon(Icons.more_horiz_rounded),
-              label: 'More',
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PlaceholderScreen extends StatelessWidget {
-  final String title;
-  final IconData icon;
-
-  const _PlaceholderScreen({required this.title, required this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Icon(
-          icon,
-          size: 64,
-          color: Theme.of(context).colorScheme.primary,
+          ),
+          child: NavigationBar(
+            backgroundColor: AppTheme.darkBlue,
+            elevation: 0,
+            height: 72,
+            selectedIndex: _currentIndex,
+            onDestinationSelected: _selectTab,
+            indicatorColor: Colors.white.withValues(alpha: 0.12),
+            surfaceTintColor: Colors.transparent,
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.dashboard_outlined),
+                selectedIcon: Icon(Icons.dashboard_rounded),
+                label: 'Home',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.history_rounded),
+                selectedIcon: Icon(Icons.history_rounded),
+                label: 'Activity',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.insights_outlined),
+                selectedIcon: Icon(Icons.insights_rounded),
+                label: 'Insights',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.settings_outlined),
+                selectedIcon: Icon(Icons.settings_rounded),
+                label: 'Profile',
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -49,7 +49,9 @@ class _PartyTransactionsScreenState
 
   @override
   Widget build(BuildContext context) {
-    if (widget.party != null) return ActivityScreen(initialFilter: _filter);
+    if (widget.party != null) {
+      return ActivityScreen(preserveDrillDown: true, initialFilter: _filter);
+    }
     final query = (
       kind: widget.isIncome
           ? BreakdownKind.incomeParties
@@ -90,8 +92,10 @@ class _PartyTransactionsScreenState
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) =>
-                              ActivityScreen(initialFilter: group.filter),
+                          builder: (_) => ActivityScreen(
+                            preserveDrillDown: true,
+                            initialFilter: group.filter,
+                          ),
                         ),
                       ),
                     ),

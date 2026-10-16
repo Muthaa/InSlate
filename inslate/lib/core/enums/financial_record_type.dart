@@ -8,4 +8,5 @@ enum FinancialRecordType {
   repayment,
   fee,
   unknown,
+  reversal,
 }

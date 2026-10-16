@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/design/design_tokens.dart';
 import '../models/financial_breakdown.dart';
 import '../core/presentation/financial_presentation.dart';
 
@@ -9,6 +10,8 @@ class FinancialGroupRow extends StatelessWidget {
   final bool showShare;
   final bool compact;
   final Color? accentColor;
+  final TextStyle? labelStyle;
+  final TextStyle? amountStyle;
   const FinancialGroupRow({
     super.key,
     required this.group,
@@ -16,6 +19,8 @@ class FinancialGroupRow extends StatelessWidget {
     this.showShare = false,
     this.compact = false,
     this.accentColor,
+    this.labelStyle,
+    this.amountStyle,
   });
 
   @override
@@ -35,11 +40,13 @@ class FinancialGroupRow extends StatelessWidget {
                   children: [
                     Text(
                       group.label,
-                      style: TextStyle(
-                        fontSize: compact ? 13 : null,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF0B1F3A),
-                      ),
+                      style:
+                          labelStyle ??
+                          TextStyle(
+                            fontSize: compact ? 13 : null,
+                            fontWeight: FontWeight.w700,
+                            color: SlateColors.of(context).ink,
+                          ),
                     ),
                     if (group.detail != null)
                       Text(
@@ -60,11 +67,13 @@ class FinancialGroupRow extends StatelessWidget {
                 child: Text(
                   formatMoney(group.amount),
                   textAlign: TextAlign.end,
-                  style: TextStyle(
-                    fontSize: compact ? 13 : null,
-                    fontWeight: FontWeight.w800,
-                    color: accentColor ?? const Color(0xFF0B1F3A),
-                  ),
+                  style:
+                      amountStyle ??
+                      TextStyle(
+                        fontSize: compact ? 13 : null,
+                        fontWeight: FontWeight.w800,
+                        color: accentColor ?? SlateColors.of(context).ink,
+                      ),
                 ),
               ),
               const Icon(Icons.chevron_right_rounded, size: 18),
@@ -78,8 +87,8 @@ class FinancialGroupRow extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: group.share.clamp(0, 1),
                     minHeight: 5,
-                    color: accentColor ?? const Color(0xFF0F9D8A),
-                    backgroundColor: const Color(0xFFEFF2F3),
+                    color: accentColor ?? SlateColors.of(context).income,
+                    backgroundColor: SlateColors.of(context).inset,
                   ),
                 ),
                 const SizedBox(width: 12),

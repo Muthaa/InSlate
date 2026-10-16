@@ -15,6 +15,7 @@ import 'package:inslate/models/financial_period.dart';
 import 'package:inslate/models/party.dart';
 import 'package:inslate/providers/financial_summary_provider.dart';
 import 'package:inslate/providers/dashboard_provider.dart';
+import 'package:inslate/providers/database_provider.dart';
 import 'package:inslate/providers/activity_provider.dart';
 import 'package:inslate/providers/repository_providers.dart';
 import 'package:inslate/screens/activity/activity_screen.dart';
@@ -49,6 +50,7 @@ void main() {
     ]);
     container = ProviderContainer(
       overrides: [
+        databaseProvider.overrideWithValue(database),
         financialRecordsRepositoryProvider.overrideWithValue(repository),
       ],
     );
@@ -56,8 +58,23 @@ void main() {
   });
   tearDown(() async {
     container.dispose();
-    await database.close();
   });
+
+  void testDashboardWidgets(
+    String name,
+    Future<void> Function(WidgetTester) body,
+  ) {
+    testWidgets(name, (tester) async {
+      try {
+        await body(tester);
+      } finally {
+        await tester.pump(Duration.zero);
+        await tester.runAsync(() => database.close());
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      }
+    });
+  }
 
   Future<void> open(WidgetTester tester, {bool settle = true}) async {
     await tester.pumpWidget(
@@ -90,10 +107,13 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  ActivityFilter activityFilter(WidgetTester tester) =>
-      tester.widget<ActivityScreen>(find.byType(ActivityScreen)).initialFilter!;
+  ActivityFilter activityFilter(WidgetTester tester) {
+    final screen = tester.widget<ActivityScreen>(find.byType(ActivityScreen));
+    expect(screen.preserveDrillDown, isTrue);
+    return screen.initialFilter!;
+  }
 
-  testWidgets(
+  testDashboardWidgets(
     'initial Dashboard load shows loading until period data arrives',
     (tester) async {
       final pending = Completer<void>();
@@ -110,7 +130,7 @@ void main() {
   );
 
   for (final refresh in [true, false]) {
-    testWidgets(
+    testDashboardWidgets(
       'same-period ${refresh ? 'refresh' : 'reload'} keeps Dashboard mounted',
       (tester) async {
         await open(tester);
@@ -132,18 +152,22 @@ void main() {
     );
   }
 
-  testWidgets('reload failure surfaces an error despite previous valid data', (
-    tester,
-  ) async {
-    await open(tester);
-    repository.fail = true;
-    container.read(financialDataRevisionProvider.notifier).state++;
-    await tester.pumpAndSettle();
-    expect(find.text('Unable to load your financial summary.'), findsOneWidget);
-    expect(find.text('Money movement'), findsNothing);
-  });
+  testDashboardWidgets(
+    'reload failure surfaces an error despite previous valid data',
+    (tester) async {
+      await open(tester);
+      repository.fail = true;
+      container.read(financialDataRevisionProvider.notifier).state++;
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Unable to load your financial summary.'),
+        findsOneWidget,
+      );
+      expect(find.text('Money movement'), findsNothing);
+    },
+  );
 
-  testWidgets(
+  testDashboardWidgets(
     'month switch does not show September principal under August selection',
     (tester) async {
       await open(tester);
@@ -196,15 +220,29 @@ void main() {
     },
   );
 
-  testWidgets(
+  testDashboardWidgets(
     'headline values are principal-only and historical month hides recent rows',
     (tester) async {
       await open(tester);
       expect(repository.periodReads, 1);
+      expect(find.text('Purpose unspecified'), findsNothing);
       expect(find.text('Into M-PESA'), findsOneWidget);
       expect(find.text('From M-PESA'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Expense categories'),
+        250,
+        scrollable: find
+            .byWidgetPredicate(
+              (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
       final expenses = find
-          .ancestor(of: find.text('Expenses'), matching: find.byType(Row))
+          .ancestor(
+            of: find.text('Expense categories'),
+            matching: find.byType(Row),
+          )
           .first;
       expect(
         find.descendant(of: expenses, matching: find.text('KSh 500.00')),
@@ -230,7 +268,7 @@ void main() {
     },
   );
 
-  testWidgets(
+  testDashboardWidgets(
     'spending follows breakdown then subtype Activity with snapshot period',
     (tester) async {
       await open(tester);
@@ -254,64 +292,72 @@ void main() {
   );
 
   for (final kind in [BreakdownKind.spending, BreakdownKind.incomeCategories]) {
-    testWidgets('$kind category preview opens parties then exact Activity', (
-      tester,
-    ) async {
-      await open(tester);
-      final group = container
-          .read(dashboardSummaryProvider)
-          .requireValue
-          .breakdown(kind)
-          .groups
-          .firstWhere(
-            (group) =>
-                group.filter.subtype ==
-                (kind == BreakdownKind.spending
-                    ? RecordSubtype.sendMoney
-                    : RecordSubtype.receiveMoney),
-          );
-      expect(find.text('View spending breakdown'), findsNothing);
-      await tapVisible(tester, find.byKey(ValueKey(group.filter)));
-      final screen = tester.widget<FinancialBreakdownScreen>(
-        find.byType(FinancialBreakdownScreen),
-      );
-      expect(
-        screen.kind,
-        kind == BreakdownKind.spending
-            ? BreakdownKind.expenseParties
-            : BreakdownKind.incomeParties,
-      );
-      expect(screen.filter.subtype, group.filter.subtype);
-      expect(screen.filter.period, period);
-      await tapVisible(tester, find.widgetWithText(FinancialGroupRow, 'Alice'));
-      expect(activityFilter(tester).party, PartyIdentity.fromParty(alice));
-      expect(activityFilter(tester).subtype, group.filter.subtype);
-      expect(activityFilter(tester).period, period);
-    });
+    testDashboardWidgets(
+      '$kind category preview opens parties then exact Activity',
+      (tester) async {
+        await open(tester);
+        final group = container
+            .read(dashboardSummaryProvider)
+            .requireValue
+            .breakdown(kind)
+            .groups
+            .firstWhere(
+              (group) =>
+                  group.filter.subtype ==
+                  (kind == BreakdownKind.spending
+                      ? RecordSubtype.sendMoney
+                      : RecordSubtype.receiveMoney),
+            );
+        expect(find.text('View spending breakdown'), findsNothing);
+        await tapVisible(tester, find.byKey(ValueKey(group.filter)));
+        final screen = tester.widget<FinancialBreakdownScreen>(
+          find.byType(FinancialBreakdownScreen),
+        );
+        expect(
+          screen.kind,
+          kind == BreakdownKind.spending
+              ? BreakdownKind.expenseParties
+              : BreakdownKind.incomeParties,
+        );
+        expect(screen.filter.subtype, group.filter.subtype);
+        expect(screen.filter.period, period);
+        await tapVisible(
+          tester,
+          find.widgetWithText(FinancialGroupRow, 'Alice'),
+        );
+        expect(activityFilter(tester).party, PartyIdentity.fromParty(alice));
+        expect(activityFilter(tester).subtype, group.filter.subtype);
+        expect(activityFilter(tester).period, period);
+      },
+    );
   }
 
   for (final item in [
     (true, 'View all Expenses'),
     (false, 'View all Income'),
   ]) {
-    testWidgets('${item.$2} opens parties then identity-filtered Activity', (
-      tester,
-    ) async {
-      await open(tester);
-      await tapVisible(tester, find.textContaining(item.$2));
-      expect(find.byType(FinancialBreakdownScreen), findsOneWidget);
-      await tapVisible(tester, find.widgetWithText(FinancialGroupRow, 'Alice'));
-      final filter = activityFilter(tester);
-      expect(filter.period, period);
-      expect(
-        filter.scope,
-        item.$1 ? ActivityScope.expenses : ActivityScope.income,
-      );
-      expect(filter.party, PartyIdentity.fromParty(alice));
-    });
+    testDashboardWidgets(
+      '${item.$2} opens parties then identity-filtered Activity',
+      (tester) async {
+        await open(tester);
+        await tapVisible(tester, find.textContaining(item.$2));
+        expect(find.byType(FinancialBreakdownScreen), findsOneWidget);
+        await tapVisible(
+          tester,
+          find.widgetWithText(FinancialGroupRow, 'Alice'),
+        );
+        final filter = activityFilter(tester);
+        expect(filter.period, period);
+        expect(
+          filter.scope,
+          item.$1 ? ActivityScope.expenses : ActivityScope.income,
+        );
+        expect(filter.party, PartyIdentity.fromParty(alice));
+      },
+    );
   }
 
-  testWidgets('Top Income row opens its exact Activity directly', (
+  testDashboardWidgets('Top Income row opens its exact Activity directly', (
     tester,
   ) async {
     await open(tester);
@@ -329,7 +375,7 @@ void main() {
     expect(activityFilter(tester).period, period);
   });
 
-  testWidgets('Top Expenses row opens its exact Activity directly', (
+  testDashboardWidgets('Top Expenses row opens its exact Activity directly', (
     tester,
   ) async {
     await open(tester);
@@ -350,7 +396,7 @@ void main() {
     expect(activityFilter(tester).period, period);
   });
 
-  testWidgets(
+  testDashboardWidgets(
     'internal movement opens family/direction grouping before Activity',
     (tester) async {
       await open(tester);
@@ -369,7 +415,7 @@ void main() {
     },
   );
 
-  testWidgets(
+  testDashboardWidgets(
     'Loans separates borrowed and repaid and drills by loan subtype',
     (tester) async {
       await open(tester);
@@ -397,7 +443,9 @@ void main() {
     },
   );
 
-  testWidgets('Dashboard capital actions form two paired rows', (tester) async {
+  testDashboardWidgets('Dashboard capital actions form two paired rows', (
+    tester,
+  ) async {
     await open(tester);
     final purchases = find.byKey(
       const ValueKey(BreakdownKind.investmentPurchases),
@@ -414,6 +462,7 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).first,
     );
+    await tester.pumpAndSettle();
     expect(tester.getTopLeft(purchases).dy, tester.getTopLeft(redemptions).dy);
     expect(tester.getTopLeft(deposits).dy, tester.getTopLeft(withdrawals).dy);
     expect(
@@ -432,7 +481,7 @@ void main() {
     BreakdownKind.savingsDeposits,
     BreakdownKind.savingsWithdrawals,
   ]) {
-    testWidgets(
+    testDashboardWidgets(
       '$kind opens its instrument groups then exact period Activity',
       (tester) async {
         await open(tester);
@@ -458,7 +507,7 @@ void main() {
     );
   }
 
-  testWidgets(
+  testDashboardWidgets(
     'Savings and investments distinguish family and provider activity',
     (tester) async {
       await open(tester);
@@ -486,7 +535,7 @@ void main() {
     },
   );
 
-  testWidgets(
+  testDashboardWidgets(
     'current month recent preview reuses rows and opens all Activity',
     (tester) async {
       final current = FinancialPeriod.month(DateTime.now());
@@ -508,7 +557,7 @@ void main() {
     },
   );
 
-  testWidgets(
+  testDashboardWidgets(
     'empty current month has truthful summaries and recent empty state',
     (tester) async {
       repository.records = [];
@@ -531,42 +580,9 @@ void main() {
     },
   );
 
-  testWidgets('narrow Dashboard and breakdown layout does not overflow', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(320, 900);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
-          theme: AppTheme.light(),
-          builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(
-              context,
-            ).copyWith(textScaler: const TextScaler.linear(1.3)),
-            child: child!,
-          ),
-          home: const DashboardScreen(),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tapVisible(tester, find.text('View savings & investments'));
-    expect(tester.takeException(), isNull);
-  });
-
-  for (final kind in [
-    BreakdownKind.spending,
-    BreakdownKind.incomeCategories,
-    BreakdownKind.expenseParties,
-    BreakdownKind.incomeParties,
-  ]) {
-    testWidgets('$kind breakdown handles narrow screens and enlarged text', (
-      tester,
-    ) async {
+  testDashboardWidgets(
+    'narrow Dashboard and breakdown layout does not overflow',
+    (tester) async {
       tester.view.physicalSize = const Size(320, 900);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -582,45 +598,81 @@ void main() {
               ).copyWith(textScaler: const TextScaler.linear(1.3)),
               child: child!,
             ),
-            home: FinancialBreakdownScreen(
-              kind: kind,
-              filter: ActivityFilter(
-                period: period,
-                scope:
-                    kind == BreakdownKind.spending ||
-                        kind == BreakdownKind.expenseParties
-                    ? ActivityScope.expenses
-                    : ActivityScope.income,
-              ),
-            ),
+            home: const DashboardScreen(),
           ),
         ),
       );
       await tester.pumpAndSettle();
-      expect(
-        find.text(
-          kind == BreakdownKind.spending || kind == BreakdownKind.expenseParties
-              ? 'Total expenses'
-              : 'Total income',
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.text(
-          kind == BreakdownKind.expenseParties ||
-                  kind == BreakdownKind.incomeParties
-              ? 'Party amounts exclude fees.'
-              : 'Category amounts and shares exclude fees.',
-        ),
-        findsOneWidget,
-      );
-      await tester.scrollUntilVisible(
-        find.byType(FinancialGroupRow).last,
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
+      await tapVisible(tester, find.text('View savings & investments'));
       expect(tester.takeException(), isNull);
-    });
+    },
+  );
+
+  for (final kind in [
+    BreakdownKind.spending,
+    BreakdownKind.incomeCategories,
+    BreakdownKind.expenseParties,
+    BreakdownKind.incomeParties,
+  ]) {
+    testDashboardWidgets(
+      '$kind breakdown handles narrow screens and enlarged text',
+      (tester) async {
+        tester.view.physicalSize = const Size(320, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              theme: AppTheme.light(),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: const TextScaler.linear(1.3)),
+                child: child!,
+              ),
+              home: FinancialBreakdownScreen(
+                kind: kind,
+                filter: ActivityFilter(
+                  period: period,
+                  scope:
+                      kind == BreakdownKind.spending ||
+                          kind == BreakdownKind.expenseParties
+                      ? ActivityScope.expenses
+                      : ActivityScope.income,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.text(
+            kind == BreakdownKind.spending ||
+                    kind == BreakdownKind.expenseParties
+                ? 'Total expenses'
+                : 'Total income',
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.text(
+            kind == BreakdownKind.expenseParties ||
+                    kind == BreakdownKind.incomeParties
+                ? 'Party amounts exclude fees.'
+                : 'Category amounts and shares exclude fees.',
+          ),
+          findsOneWidget,
+        );
+        await tester.scrollUntilVisible(
+          find.byType(FinancialGroupRow).last,
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   for (final kind in [
@@ -632,7 +684,7 @@ void main() {
     BreakdownKind.savingsDeposits,
     BreakdownKind.savingsWithdrawals,
   ]) {
-    testWidgets(
+    testDashboardWidgets(
       '$kind account movement layout supports narrow screens and enlarged text',
       (tester) async {
         tester.view.physicalSize = const Size(320, 800);
@@ -670,7 +722,9 @@ void main() {
             kind == BreakdownKind.internalMovement
                 ? 'Total internal movement'
                 : kind == BreakdownKind.loans
-                ? 'Total loan activity'
+                ? 'Loan activity'
+                : kind == BreakdownKind.investmentsAndSavings
+                ? 'Savings & investment activity'
                 : 'Total contributions & withdrawals',
           ),
           findsOneWidget,
@@ -685,7 +739,9 @@ void main() {
     );
   }
 
-  testWidgets('Dashboard error can retry the period query', (tester) async {
+  testDashboardWidgets('Dashboard error can retry the period query', (
+    tester,
+  ) async {
     repository.fail = true;
     await open(tester);
     expect(find.text('Unable to load your financial summary.'), findsOneWidget);
@@ -696,7 +752,7 @@ void main() {
     expect(find.text('Expense categories'), findsOneWidget);
   });
 
-  testWidgets(
+  testDashboardWidgets(
     'breakdown retries a failed period query into a truthful empty state',
     (tester) async {
       repository.fail = true;

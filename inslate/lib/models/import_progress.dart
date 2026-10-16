@@ -14,7 +14,11 @@ class ImportProgress {
   final int processed;
   final int imported;
   final int skipped;
+  final int duplicate;
   final int failed;
+  final int rawCreated;
+  final int evidenceCreated;
+  final Map<String, int> reasons;
   final String? error;
 
   const ImportProgress({
@@ -23,7 +27,11 @@ class ImportProgress {
     this.processed = 0,
     this.imported = 0,
     this.skipped = 0,
+    this.duplicate = 0,
     this.failed = 0,
+    this.rawCreated = 0,
+    this.evidenceCreated = 0,
+    this.reasons = const {},
     this.error,
   });
 

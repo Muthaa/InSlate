@@ -13,5 +13,12 @@ class Accounts extends Table {
 
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
 
+  /// Only explicit registration sets this. Legacy/provider rows stay unconfirmed.
+  BoolColumn get isUserRegistered =>
+      boolean().withDefault(const Constant(false))();
+
+  /// Optional descriptive identifiers, never credentials or inferred identities.
+  TextColumn get identifiers => text().nullable()();
+
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }

@@ -53,10 +53,12 @@ class FinancialBreakdownService {
       BreakdownKind.savingsDeposits => {
         RecordSubtype.mshwariDeposit,
         RecordSubtype.kcbDeposit,
+        RecordSubtype.registeredSavingsDeposit,
       },
       BreakdownKind.savingsWithdrawals => {
         RecordSubtype.mshwariWithdrawal,
         RecordSubtype.kcbWithdrawal,
+        RecordSubtype.registeredSavingsWithdrawal,
       },
       _ => null,
     };
@@ -69,7 +71,10 @@ class FinancialBreakdownService {
         )
         .toList();
     const semantics = FinancialSemantics();
-    final total = matched.fold<double>(0, (sum, record) => sum + record.amount);
+    final total = matched.fold<double>(
+      0,
+      (sum, record) => sum + FinancialSemantics.principalContribution(record),
+    );
     final sectionGroups = <String, Map<ActivityFilter, _Group>>{};
     void add(
       String section,
@@ -81,7 +86,7 @@ class FinancialBreakdownService {
       final group = sectionGroups
           .putIfAbsent(section, () => {})
           .putIfAbsent(filter, () => _Group(label, filter, detail));
-      group.amount += record.amount;
+      group.amount += FinancialSemantics.principalContribution(record);
       group.fees += record.transactionCost;
       group.count++;
     }
@@ -199,8 +204,16 @@ class FinancialBreakdownService {
                 ? 'Invested'
                 : 'Deposited';
             final name =
-                investment && record.party?.name.trim().isNotEmpty == true
+                (investment ||
+                        FinancialSemantics.forSubtype(
+                          record.subtype,
+                        ).registeredSavings) &&
+                    record.party?.name.trim().isNotEmpty == true
                 ? record.party!.name.trim()
+                : FinancialSemantics.forSubtype(
+                    record.subtype,
+                  ).registeredSavings
+                ? 'Registered savings'
                 : accountLabel(other.type);
             add(
               investment ? 'Investments' : 'Savings',
@@ -300,7 +313,7 @@ class FinancialBreakdownService {
           filter,
           () => _Group(subtypeLabel(record.subtype), filter),
         );
-        group.amount += record.amount;
+        group.amount += FinancialSemantics.principalContribution(record);
         group.fees += record.transactionCost;
         group.count++;
       }

@@ -7,6 +7,7 @@ import 'activity_provider.dart';
 final financialRecordsProvider = FutureProvider<List<FinancialRecord>>((
   ref,
 ) async {
+  ref.watch(financialDataRevisionProvider);
   final repository = ref.watch(financialRecordsRepositoryProvider);
 
   return repository.getAll();

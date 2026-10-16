@@ -14,6 +14,10 @@ class FinancialPeriod {
     DateTime(date.year, date.month + 1),
   );
 
+  /// Covers the full supported calendar range, independently of loaded history.
+  factory FinancialPeriod.allTime() =>
+      FinancialPeriod(DateTime(1), DateTime(10000));
+
   bool contains(DateTime date) => !date.isBefore(start) && date.isBefore(end);
 
   @override

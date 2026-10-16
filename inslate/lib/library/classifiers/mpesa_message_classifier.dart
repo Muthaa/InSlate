@@ -4,7 +4,7 @@ import '/core/enums/record_subtype.dart';
 import '/core/enums/transaction_status.dart';
 import 'message_classifier.dart';
 import '/core/extensions/string_extensions.dart';
-import '/core/constants/investment_keywords.dart';
+import '/core/constants/instrument_catalogue.dart';
 import '/core/constants/mpesa_patterns.dart';
 import '/core/constants/mshwari_loan_patterns.dart';
 
@@ -68,7 +68,9 @@ class MpesaMessageClassifier implements MessageClassifier {
           ? text.substring(0, balanceIndex)
           : text;
 
-      return InvestmentKeywords.providers.any(transactionText.contains);
+      return InstrumentCatalogue.investmentKeywords.any(
+        transactionText.contains,
+      );
     }
 
     if (text.contains(MpesaKeywords.sentTo) &&
