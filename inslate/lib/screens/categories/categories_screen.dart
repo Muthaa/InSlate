@@ -41,7 +41,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     final result = await showDialog<String>(
       context: context,
       builder: (context) => AppDialog(
-        icon: Icons.category_outlined,
+        icon: Icons.label_outline_rounded,
         title: Text(
           category == null ? 'New ${kind.name} category' : 'Rename category',
         ),
@@ -56,7 +56,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
               hintText: kind == CategoryKind.income
                   ? 'e.g. Freelance work'
                   : 'e.g. Groceries',
-              prefixIcon: const Icon(Icons.category_outlined),
+              prefixIcon: const Icon(Icons.label_outline_rounded),
               filled: true,
               fillColor: Colors.white,
               border: OutlineInputBorder(
@@ -104,7 +104,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AppDialog(
-        icon: Icons.category_outlined,
+        icon: Icons.label_outline_rounded,
         title: Text('Delete ${category.name}?'),
         content: const Text(
           'Its automatic rules and transaction assignments will be removed. Those transactions will become uncategorized. Financial records will not be deleted.',
@@ -204,7 +204,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     appBar: AppBar(
       title: const Row(
         children: [
-          Icon(Icons.category_outlined, size: 24),
+          Icon(Icons.label_outline_rounded, size: 24),
           SizedBox(width: 10),
           Expanded(
             child: Column(

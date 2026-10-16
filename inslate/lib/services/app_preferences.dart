@@ -1,6 +1,23 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-enum LocalAvatar { robot, person, face, astronaut, pet, star }
+enum LocalAvatar {
+  robot,
+  person,
+  face,
+  astronaut,
+  pet,
+  star,
+  bunny,
+  gamer,
+  reader,
+  explorer,
+  bird,
+  flower,
+  sun,
+  moon,
+  planet,
+  mountain,
+}
 
 class AppPreferences {
   AppPreferences(this._preferences);

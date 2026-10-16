@@ -1,3 +1,7 @@
+import 'dart:async';
+import '../helpers/activity_scroll.dart';
+import 'package:inslate/providers/activity_timeline_provider.dart';
+import 'package:inslate/models/activity_cursor.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,6 +25,7 @@ import '../services/financial_summary_service_test.dart' show record;
 class _SearchRepository extends FinancialRecordsRepository {
   final queries = <({ActivityFilter filter, int offset})>[];
   int counts = 0;
+  final gates = <String, Completer<void>>{};
   _SearchRepository(super.database);
   @override
   Future<List<FinancialRecord>> getAll() =>
@@ -30,14 +35,22 @@ class _SearchRepository extends FinancialRecordsRepository {
     ActivityFilter filter, {
     int? limit,
     int offset = 0,
-  }) {
+    ActivityCursor? before,
+  }) async {
     queries.add((filter: filter, offset: offset));
-    return super.getActivity(filter, limit: limit, offset: offset);
+    await gates[filter.search]?.future;
+    return super.getActivity(
+      filter,
+      limit: limit,
+      offset: offset,
+      before: before,
+    );
   }
 
   @override
-  Future<int> countActivity(ActivityFilter filter) {
+  Future<int> countActivity(ActivityFilter filter) async {
     counts++;
+    await gates[filter.search]?.future;
     return super.countActivity(filter);
   }
 }
@@ -103,7 +116,7 @@ void main() {
       });
 
   searchTest(
-    'debounced search filters complete dataset resets page and exact counts; clear restores',
+    'debounced search filters complete dataset resets loaded results and exact counts; clear restores',
     (tester) async {
       await repository.saveAll([
         for (var i = 0; i < 80; i++)
@@ -112,8 +125,7 @@ void main() {
           record(RecordSubtype.sendMoney, i.toDouble(), party: bob),
       ]);
       await open(tester);
-      await tap(tester, find.byTooltip('Last page'));
-      expect(find.text('4 of 4'), findsOneWidget);
+      await scrollActivityToEnd(tester);
       final reads = repository.queries.length;
       final counts = repository.counts;
       await tester.enterText(searchField, 'Al');
@@ -127,21 +139,43 @@ void main() {
       await tester.pumpAndSettle();
       expect(repository.queries.length, reads + 1);
       expect(repository.queries.last.offset, 0);
-      expect(find.text('1 of 2'), findsOneWidget);
       expect(find.text('80 transactions'), findsOneWidget);
-      expect(find.text('1 of 2'), findsOneWidget);
-      await tap(tester, find.byTooltip('Next page'));
+      await scrollActivityToEnd(tester);
       final beforeEquivalent = repository.queries.length;
       await search(tester, ' ALICE  ');
       expect(repository.queries.length, beforeEquivalent);
-      expect(find.text('2 of 2'), findsOneWidget);
       await tap(tester, find.byTooltip('Clear search'));
-      expect(find.text('1 of 4'), findsOneWidget);
       expect(find.text('160 transactions'), findsOneWidget);
       expect(repository.queries.last.filter.search, '');
       expect(tester.widget<TextField>(searchField).controller!.text, '');
     },
   );
+
+  searchTest('late searches cannot replace newer results or counts', (
+    tester,
+  ) async {
+    await repository.saveAll([
+      record(RecordSubtype.sendMoney, 1, party: alice),
+      record(RecordSubtype.sendMoney, 2, party: bob),
+      record(RecordSubtype.sendMoney, 3, party: bob),
+    ]);
+    await open(tester);
+    final gate = Completer<void>();
+    repository.gates['alice'] = gate;
+    await tester.enterText(searchField, 'Alice');
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump();
+    expect(find.text('3 transactions'), findsNothing);
+    expect(find.text('Counting transactions…'), findsOneWidget);
+    await search(tester, 'Bob');
+    expect(find.text('2 transactions'), findsOneWidget);
+    gate.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('2 transactions'), findsOneWidget);
+    expect(find.text('1 transactions'), findsNothing);
+    expect(find.widgetWithText(TransactionRow, 'Alice'), findsNothing);
+    expect(find.widgetWithText(TransactionRow, 'Bob'), findsNWidgets(2));
+  });
 
   searchTest(
     'Dashboard filter snapshot composes with search and no-results clearing',
@@ -165,7 +199,7 @@ void main() {
       expect(find.text('1 transactions'), findsOneWidget);
       await search(tester, 'unmatched');
       expect(find.text('No matching transactions'), findsOneWidget);
-      expect(find.text('0 transactions · 0 pages'), findsOneWidget);
+      expect(find.text('0 transactions'), findsOneWidget);
       await tap(tester, find.byTooltip('Clear search'));
       expect(repository.queries.last.filter, initial);
       expect(find.text('1 transactions'), findsOneWidget);
@@ -230,7 +264,7 @@ void main() {
   );
 
   searchTest(
-    'transaction detail return retains search page and filters without requery',
+    'transaction detail return retains search, scroll position and filters without requery',
     (tester) async {
       await repository.saveAll([
         for (var i = 0; i < 70; i++)
@@ -244,22 +278,69 @@ void main() {
       );
       await open(tester, filter);
       await search(tester, 'Alice');
-      await tap(tester, find.byTooltip('Next page'));
+      await scrollActivityToEnd(tester);
       final reads = repository.queries.length;
-      await tap(tester, find.widgetWithText(TransactionRow, 'Alice').first);
+      final list = tester.widget<ListView>(
+        find.byKey(const ValueKey('activity.timeline')),
+      );
+      final visibleRow = find.widgetWithText(TransactionRow, 'Alice').first;
+      await tester.ensureVisible(visibleRow);
+      await tester.pumpAndSettle();
+      final offset = list.controller!.offset;
+      await tester.tap(visibleRow);
+      await tester.pumpAndSettle();
       expect(find.text('Transaction details'), findsOneWidget);
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(tester.widget<TextField>(searchField).controller!.text, 'Alice');
-      expect(find.text('2 of 2'), findsOneWidget);
       expect(find.text('70 transactions'), findsOneWidget);
       expect(repository.queries.last.filter, filter.withSearch('alice'));
       expect(repository.queries.length, reads);
+      expect(list.controller!.offset, offset);
     },
   );
 
   searchTest(
-    'refresh retains search and typed filters and resets pagination as before',
+    'amount search updates SQL count and timeline, new transactions refresh loaded depth',
+    (tester) async {
+      await repository.saveAll([
+        for (var i = 0; i < 70; i++)
+          record(RecordSubtype.sendMoney, 1500, party: alice),
+        record(RecordSubtype.sendMoney, 500, party: bob),
+      ]);
+      await open(tester);
+      await search(tester, 'KSh 1500');
+      expect(find.text('70 transactions'), findsOneWidget);
+      await scrollActivityToEnd(tester);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(ActivityContent)),
+      );
+      final filter = ActivityFilter(period: period, search: 'KSh 1500');
+      expect(
+        container.read(activityTimelineProvider(filter)).records,
+        hasLength(70),
+      );
+      await repository.save(
+        record(RecordSubtype.sendMoney, 1500, party: alice),
+      );
+      await tester.pumpAndSettle();
+      final state = container.read(activityTimelineProvider(filter));
+      expect(state.records, hasLength(71));
+      expect(state.records.map((r) => r.id).toSet(), hasLength(71));
+      expect(
+        state.records.map((r) => r.id).toList(),
+        orderedEquals(
+          state.records.map((r) => r.id).toList()
+            ..sort((a, b) => b!.compareTo(a!)),
+        ),
+      );
+      expect(find.text('71 transactions'), findsOneWidget);
+      expect(state.records.every((r) => r.amount == 1500), isTrue);
+    },
+  );
+
+  searchTest(
+    'refresh retains search and typed filters and retains loaded depth',
     (tester) async {
       await repository.saveAll([
         for (var i = 0; i < 70; i++)
@@ -272,9 +353,8 @@ void main() {
       );
       await open(tester, filter.withSearch('alice'));
       expect(tester.widget<TextField>(searchField).controller!.text, 'alice');
-      await tap(tester, find.byTooltip('Next page'));
+      await scrollActivityToEnd(tester);
       await tap(tester, find.byTooltip('Refresh activity'));
-      expect(find.text('1 of 2'), findsOneWidget);
       expect(repository.queries.last.filter, filter.withSearch('alice'));
       expect(find.text('70 transactions'), findsOneWidget);
     },

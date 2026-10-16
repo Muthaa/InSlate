@@ -1,3 +1,4 @@
+import '../helpers/activity_scroll.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -38,7 +39,7 @@ class ShellTestImporter extends ImportNotifier {
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
   testWidgets(
-    'Activity loads lazily, retains its page and preserves resume reconciliation',
+    'Activity loads lazily, retains its loaded timeline and preserves resume reconciliation',
     (tester) async {
       final database = AppDatabase.forTesting(NativeDatabase.memory());
       final repository = ActivityTestRepository(database, [
@@ -88,9 +89,13 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(repository.activityReads, 1);
-        await tester.tap(find.byTooltip('Next page'));
-        await tester.pumpAndSettle();
-        expect(find.text('2 of 2'), findsOneWidget);
+        await scrollActivityToEnd(tester);
+        final controller = tester
+            .widget<ListView>(find.byKey(const ValueKey('activity.timeline')))
+            .controller!;
+        final offset = controller.offset;
+        final reads = repository.activityReads;
+        expect(find.text('55 transactions'), findsOneWidget);
         await tester.tap(
           find.descendant(
             of: find.byType(NavigationBar),
@@ -105,7 +110,8 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(find.text('2 of 2'), findsOneWidget);
+        expect(controller.offset, offset);
+        expect(repository.activityReads, reads);
         // Follow platform transitions; EditableText's lifecycle listener validates
         // the sequence now that Activity includes a search field.
         tester.binding.handleAppLifecycleStateChanged(

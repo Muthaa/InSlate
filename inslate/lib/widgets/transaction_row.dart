@@ -161,7 +161,11 @@ class TransactionRow extends StatelessWidget {
       Text(record.reference),
     ];
     return DefaultTextStyle(
-      style: TextStyle(fontSize: 11, color: palette.muted),
+      style: TextStyle(
+        fontSize: 11,
+        color: palette.muted,
+        fontFamily: Theme.of(context).textTheme.bodySmall?.fontFamily,
+      ),
       child: singleLine
           ? Row(
               mainAxisSize: MainAxisSize.min,

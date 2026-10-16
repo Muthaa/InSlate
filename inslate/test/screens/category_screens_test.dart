@@ -1,3 +1,5 @@
+import '../helpers/activity_scroll.dart';
+import 'package:inslate/models/activity_cursor.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,9 +29,15 @@ class _CountingRepository extends FinancialRecordsRepository {
     ActivityFilter filter, {
     int? limit,
     int offset = 0,
+    ActivityCursor? before,
   }) async {
     pageReads++;
-    return super.getActivity(filter, limit: limit, offset: offset);
+    return super.getActivity(
+      filter,
+      limit: limit,
+      offset: offset,
+      before: before,
+    );
   }
 }
 
@@ -394,9 +402,15 @@ void main() {
         offset: 50,
       )).single.id!;
       await open(tester, ActivityScreen(initialFilter: filter));
-      await tap(tester, find.byTooltip('Next page'));
+      await scrollActivityToEnd(tester);
       final before = records.pageReads;
-      await tap(tester, find.text('Shop').first);
+      await tap(
+        tester,
+        find.descendant(
+          of: find.byKey(ValueKey('activity.record.$id')),
+          matching: find.text('Shop'),
+        ),
+      );
       expect(find.text('Transaction details'), findsOneWidget);
       await tap(tester, find.text('Add category'));
       await tap(tester, find.text('Food & groceries'));
@@ -408,7 +422,7 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(records.pageReads, before);
-      expect(find.text('2 of 2'), findsOneWidget);
+      expect(find.byTooltip('Next page'), findsNothing);
       expect(find.text('September 2026'), findsOneWidget);
     },
   );

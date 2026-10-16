@@ -59,8 +59,8 @@ class ProfileOverviewScreen extends ConsumerWidget {
                 ),
               ),
               data: (preferences) => Container(
-                padding: const EdgeInsets.all(20),
-                margin: const EdgeInsets.only(bottom: 24),
+                padding: const EdgeInsets.all(14),
+                margin: const EdgeInsets.only(bottom: 18),
                 decoration: BoxDecoration(
                   color: AppTheme.darkBlue.withValues(alpha: 0.9),
                   borderRadius: BorderRadius.circular(24),
@@ -86,8 +86,23 @@ class ProfileOverviewScreen extends ConsumerWidget {
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              const Text(
-                                'Personal finances, on your device',
+                              const Text.rich(
+                                TextSpan(
+                                  children: [
+                                    TextSpan(
+                                      text:
+                                          'Personal finances, on your device ',
+                                    ),
+                                    WidgetSpan(
+                                      alignment: PlaceholderAlignment.middle,
+                                      child: Icon(
+                                        Icons.phonelink_lock_outlined,
+                                        color: Colors.white70,
+                                        size: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.white70,
@@ -112,25 +127,10 @@ class ProfileOverviewScreen extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    const Row(
-                      children: [
-                        Icon(
-                          Icons.phonelink_lock_outlined,
-                          color: Colors.white70,
-                          size: 16,
-                        ),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Stored locally. No online account or cloud sync.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.white70,
-                            ),
-                          ),
-                        ),
-                      ],
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Stored locally. No online account or cloud sync.',
+                      style: TextStyle(fontSize: 11, color: Colors.white70),
                     ),
                   ],
                 ),
@@ -187,6 +187,20 @@ class _FinanceGrid extends StatelessWidget {
               screen: const SettingsScreen(setting: ProfileSetting.backup),
             ),
             (
+              title: 'Export data',
+              subtitle: 'Future implementation',
+              icon: Icons.file_download_outlined,
+              accent: SlateColors.brandBlue,
+              screen: const SettingsScreen(setting: ProfileSetting.export),
+            ),
+            (
+              title: 'Contact us',
+              subtitle: 'Future implementation',
+              icon: Icons.mail_outline_rounded,
+              accent: SlateColors.brandBlue,
+              screen: const SettingsScreen(setting: ProfileSetting.contact),
+            ),
+            (
               title: 'Help & about',
               subtitle: 'Financial definitions, help and licenses',
               icon: Icons.help_outline_rounded,
@@ -212,7 +226,7 @@ class _FinanceGrid extends StatelessWidget {
             (
               title: 'Categories',
               subtitle: 'Manage income and expense categories',
-              icon: Icons.category_outlined,
+              icon: Icons.label_outline_rounded,
               accent: SlateColors.brandYellow,
               screen: const CategoriesScreen(),
             ),
@@ -265,7 +279,7 @@ class _FinanceGrid extends StatelessWidget {
                                 fontWeight: FontWeight.w700,
                               ),
                         ),
-                        if (item.title == 'Backup & restore')
+                        if (item.subtitle == 'Future implementation')
                           const Text(
                             'Future implementation',
                             style: TextStyle(
@@ -288,6 +302,15 @@ class _FinanceGrid extends StatelessWidget {
           ),
         ),
     ];
-    return ResponsiveCardGrid(children: tiles);
+    return settings
+        ? Column(
+            children: [
+              for (var i = 0; i < tiles.length; i++) ...[
+                if (i > 0) const SizedBox(height: 8),
+                tiles[i],
+              ],
+            ],
+          )
+        : ResponsiveCardGrid(children: tiles);
   }
 }

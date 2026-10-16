@@ -35,12 +35,22 @@ void main() {
           'Appearance',
           'Privacy & app lock',
           'Backup & restore',
+          'Export data',
+          'Contact us',
           'Help & about',
         ]) {
           final menu = find.byKey(ValueKey('profile.menu.$title'));
           await tester.scrollUntilVisible(menu, 200);
           await tester.ensureVisible(menu);
           await tester.pumpAndSettle();
+          expect(
+            tester.getRect(menu).width,
+            greaterThan(
+              tester.view.physicalSize.width /
+                  tester.view.devicePixelRatio *
+                  0.8,
+            ),
+          );
           await tester.tap(menu);
           await tester.pumpAndSettle();
           expect(find.byType(SettingsScreen), findsOneWidget);
@@ -72,9 +82,18 @@ void main() {
               isTrue,
             );
           }
-          if (title == 'Backup & restore') {
+          if ([
+            'Backup & restore',
+            'Export data',
+            'Contact us',
+          ].contains(title)) {
             expect(find.text('Future implementation'), findsOneWidget);
-            expect(find.textContaining('not available yet'), findsOneWidget);
+            expect(
+              find.textContaining(
+                title == 'Contact us' ? 'future update' : 'not available yet',
+              ),
+              findsOneWidget,
+            );
           }
           if (title == 'Help & about') {
             await tester.tap(find.text('Cash flow and balance'));
