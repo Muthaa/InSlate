@@ -11,6 +11,16 @@ IconData localAvatarIcon(LocalAvatar avatar) => switch (avatar) {
   LocalAvatar.astronaut => Icons.rocket_launch_rounded,
   LocalAvatar.pet => Icons.pets_rounded,
   LocalAvatar.star => Icons.star_rounded,
+  LocalAvatar.bunny => Icons.cruelty_free_rounded,
+  LocalAvatar.gamer => Icons.sports_esports_rounded,
+  LocalAvatar.reader => Icons.auto_stories_rounded,
+  LocalAvatar.explorer => Icons.catching_pokemon_rounded,
+  LocalAvatar.bird => Icons.flutter_dash_rounded,
+  LocalAvatar.flower => Icons.local_florist_rounded,
+  LocalAvatar.sun => Icons.wb_sunny_rounded,
+  LocalAvatar.moon => Icons.nightlight_round,
+  LocalAvatar.planet => Icons.public_rounded,
+  LocalAvatar.mountain => Icons.landscape_rounded,
 };
 
 class LocalAvatarButton extends ConsumerWidget {
@@ -104,24 +114,20 @@ class _AvatarPickerState extends ConsumerState<_AvatarPicker> {
             const SizedBox(height: 20),
             LayoutBuilder(
               builder: (context, constraints) {
-                final columns =
-                    constraints.maxWidth < 300 ||
-                        MediaQuery.textScalerOf(context).scale(16) > 22
-                    ? 2
-                    : 3;
+                const columns = 4;
                 return Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
                     for (final avatar in LocalAvatar.values)
                       SizedBox(
                         width:
-                            (constraints.maxWidth - 12 * (columns - 1)) /
+                            (constraints.maxWidth - 8 * (columns - 1)) /
                             columns,
                         child: OutlinedButton(
                           key: ValueKey('avatar.${avatar.name}'),
                           style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                             foregroundColor: AppTheme.darkBlue,
                             backgroundColor: avatar == selected
                                 ? AppTheme.teal.withValues(alpha: 0.12)
@@ -139,7 +145,7 @@ class _AvatarPickerState extends ConsumerState<_AvatarPicker> {
                           child: Column(
                             children: [
                               Container(
-                                padding: const EdgeInsets.all(12),
+                                padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
                                   color: avatar == selected
                                       ? AppTheme.teal
@@ -148,7 +154,7 @@ class _AvatarPickerState extends ConsumerState<_AvatarPicker> {
                                 ),
                                 child: Icon(
                                   localAvatarIcon(avatar),
-                                  size: 32,
+                                  size: 24,
                                   color: avatar == selected
                                       ? Colors.white
                                       : AppTheme.darkBlue,
@@ -159,6 +165,8 @@ class _AvatarPickerState extends ConsumerState<_AvatarPicker> {
                                 avatar == LocalAvatar.astronaut
                                     ? 'Rocket'
                                     : '${avatar.name[0].toUpperCase()}${avatar.name.substring(1)}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 11),
                               ),
                               if (avatar == selected)
                                 const Icon(

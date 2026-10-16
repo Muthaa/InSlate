@@ -1,3 +1,4 @@
+import '../models/activity_cursor.dart';
 import 'package:drift/drift.dart';
 import 'categories_repository.dart';
 import 'instrument_mappings_repository.dart';
@@ -149,6 +150,7 @@ class FinancialRecordsRepository {
     ActivityFilter filter, {
     int? limit,
     int offset = 0,
+    ActivityCursor? before,
   }) async {
     if (offset < 0 || (limit != null && limit <= 0)) {
       throw ArgumentError('Invalid page bounds');
@@ -176,13 +178,13 @@ class FinancialRecordsRepository {
       );
       const batchSize = 100;
       final matches = <domain.FinancialRecord>[];
-      var candidateOffset = 0;
+      ActivityCursor? candidateCursor = before;
       var matchedCount = 0;
       while (true) {
         final rows = await database.financialRecordsDao.getActivityCandidates(
           candidateFilter,
           limit: batchSize,
-          offset: candidateOffset,
+          before: candidateCursor,
         );
         for (final row in rows) {
           final record = toDomain(row);
@@ -192,13 +194,14 @@ class FinancialRecordsRepository {
           if (limit != null && matches.length == limit) return matches;
         }
         if (rows.length < batchSize) return matches;
-        candidateOffset += rows.length;
+        candidateCursor = ActivityCursor.fromRecord(toDomain(rows.last));
       }
     }
     final rows = await database.financialRecordsDao.getActivityCandidates(
       filter,
       limit: limit,
       offset: offset,
+      before: before,
     );
     return rows.map(toDomain).toList();
   }

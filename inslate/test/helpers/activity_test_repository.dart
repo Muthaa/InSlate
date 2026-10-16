@@ -1,3 +1,4 @@
+import 'package:inslate/models/activity_cursor.dart';
 import 'package:inslate/models/activity_filter.dart';
 import 'package:inslate/models/financial_records.dart';
 import 'package:inslate/models/financial_period.dart';
@@ -60,12 +61,34 @@ class ActivityTestRepository extends FinancialRecordsRepository {
     ActivityFilter filter, {
     int? limit,
     int offset = 0,
+    ActivityCursor? before,
   }) async {
     activityReads++;
     lastFilter = filter;
     await pendingRead;
     if (fail) throw StateError('Test query failure');
-    final matches = records.where(filter.matches).toList();
+    final matches =
+        <FinancialRecord>[
+              for (var i = 0; i < records.length; i++)
+                _persisted(records[i], records.length - i),
+            ]
+            .where(filter.matches)
+            .where(
+              (r) =>
+                  before == null ||
+                  (r.transactionDate ?? r.receivedAt).isBefore(
+                    before.timestamp,
+                  ) ||
+                  ((r.transactionDate ?? r.receivedAt) == before.timestamp &&
+                      r.id! < before.id),
+            )
+            .toList()
+          ..sort((a, b) {
+            final date = (b.transactionDate ?? b.receivedAt).compareTo(
+              a.transactionDate ?? a.receivedAt,
+            );
+            return date == 0 ? b.id!.compareTo(a.id!) : date;
+          });
     return matches.skip(offset).take(limit ?? matches.length).toList();
   }
 
@@ -85,3 +108,19 @@ class ActivityTestRepository extends FinancialRecordsRepository {
     }).toSet();
   }
 }
+
+FinancialRecord _persisted(FinancialRecord r, int id) => FinancialRecord(
+  id: r.id ?? id,
+  reference: r.reference,
+  transactionDate: r.transactionDate,
+  amount: r.amount,
+  balance: r.balance,
+  type: r.type,
+  subtype: r.subtype,
+  status: r.status,
+  title: r.title,
+  rawMessage: r.rawMessage,
+  receivedAt: r.receivedAt,
+  party: r.party,
+  transactionCost: r.transactionCost,
+);

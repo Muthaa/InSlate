@@ -1,3 +1,4 @@
+import 'activity_amount_search.dart';
 import '../core/enums/account_type.dart';
 import '../core/enums/record_subtype.dart';
 import '../models/financial_records.dart';
@@ -199,6 +200,8 @@ class ActivityFilter {
   bool matches(FinancialRecord record) {
     if (provider != null && !provider!.matches(record)) return false;
     if (search.isNotEmpty &&
+        !(ActivityAmountSearch.parse(search)?.matches(record.amount) ??
+            false) &&
         ![
           record.party?.name,
           record.title,

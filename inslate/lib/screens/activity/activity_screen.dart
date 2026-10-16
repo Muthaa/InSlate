@@ -1,9 +1,7 @@
-import '../../widgets/app_dialog.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter/services.dart';
 import '../../core/enums/account_type.dart';
 import '../../core/presentation/financial_presentation.dart';
 import '../../core/theme/app_theme.dart';
@@ -13,6 +11,9 @@ import '../../providers/category_provider.dart';
 import 'activity_advanced_filters.dart';
 import '../../models/financial_period.dart';
 import '../../providers/activity_provider.dart';
+import '../../providers/activity_timeline_provider.dart';
+import '../../models/financial_records.dart';
+import '../../services/activity_grouping.dart';
 import '../../services/financial_semantics.dart';
 import '../../widgets/transaction_row.dart';
 import 'transaction_detail_screen.dart';
@@ -78,7 +79,6 @@ class ActivityContent extends ConsumerStatefulWidget {
 class _ActivityContentState extends ConsumerState<ActivityContent> {
   late ActivityFilter _filter;
   late ActivityFilter _constraints;
-  int _page = 0;
   final _scrollController = ScrollController();
   late final TextEditingController _searchController;
   Timer? _searchDebounce;
@@ -93,6 +93,7 @@ class _ActivityContentState extends ConsumerState<ActivityContent> {
         ? _filter
         : ActivityFilter(period: _filter.period, central: _filter.central);
     _searchController = TextEditingController(text: _filter.search);
+    _scrollController.addListener(_loadNearBottom);
   }
 
   @override
@@ -106,7 +107,6 @@ class _ActivityContentState extends ConsumerState<ActivityContent> {
   void _changeFilter(ActivityFilter filter) {
     setState(() {
       _filter = filter;
-      _page = 0;
     });
     _scrollToTop();
   }
@@ -297,73 +297,163 @@ class _ActivityContentState extends ConsumerState<ActivityContent> {
     }
   }
 
-  void _goToPage(int page) {
-    setState(() => _page = page);
-    _scrollToTop();
+  Widget _timeline(ActivityTimeline timeline) {
+    if (timeline.records.isEmpty) {
+      if (timeline.loading) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      if (timeline.failed) {
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Unable to load activity.'),
+              TextButton(
+                onPressed: () => ref
+                    .read(activityTimelineProvider(_filter).notifier)
+                    .retry(),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        );
+      }
+      return _ActivityEmptyState(
+        icon: Icons.receipt_long_outlined,
+        title: _filter.search.isEmpty
+            ? 'Nothing to show yet'
+            : 'No matching transactions',
+        message: _filter.search.isEmpty
+            ? 'No activity found for this period and filters.'
+            : 'Try a different search or adjust the period and filters.',
+      );
+    }
+    final items = <Object>[];
+    for (final day in groupActivityByDay(timeline.records)) {
+      items.add(day);
+      items.addAll(day.records);
+    }
+    return ListView.builder(
+      key: const ValueKey('activity.timeline'),
+      controller: _scrollController,
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      itemCount: items.length + 1,
+      itemBuilder: (context, index) {
+        if (index == items.length) {
+          if (timeline.failed) {
+            return Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  const Text('Unable to load more activity.'),
+                  TextButton(
+                    onPressed: () => ref
+                        .read(activityTimelineProvider(_filter).notifier)
+                        .retry(),
+                    child: const Text('Retry loading activity'),
+                  ),
+                ],
+              ),
+            );
+          }
+          if (timeline.loading) {
+            return const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            );
+          }
+          return const SizedBox(height: 8);
+        }
+        final item = items[index];
+        if (item is ActivityDay) {
+          return Padding(
+            key: ValueKey('activity.day.${item.date.toIso8601String()}'),
+            padding: EdgeInsets.only(top: index == 0 ? 0 : 12, bottom: 6),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    DateFormat.yMMMMEEEEd().format(item.date),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.darkBlue,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.darkBlue.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${item.records.length}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.darkBlue,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        final record = item as FinancialRecord;
+        final first = index > 0 && items[index - 1] is ActivityDay;
+        final last =
+            index == items.length - 1 || items[index + 1] is ActivityDay;
+        return Material(
+          key: ValueKey('activity.record.${record.id}'),
+          color: Colors.white,
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(first ? 18 : 0),
+              bottom: Radius.circular(last ? 18 : 0),
+            ),
+            side: const BorderSide(color: Color(0xFFE8ECEF)),
+          ),
+          child: TransactionRow(
+            record: record,
+            central: _filter.central,
+            fullWidthMetadata: true,
+            onTap: record.id == null
+                ? null
+                : () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => TransactionDetailScreen(
+                        recordId: record.id!,
+                        central: _filter.central,
+                      ),
+                    ),
+                  ),
+          ),
+        );
+      },
+    );
   }
 
-  Future<void> _choosePage(int pages) async {
-    var pageInput = '${_page + 1}';
-    final form = GlobalKey<FormState>();
-    final selected = await showDialog<int>(
-      context: context,
-      builder: (context) => AppDialog(
-        icon: Icons.find_in_page_outlined,
-        title: const Text('Go to page'),
-        content: Form(
-          key: form,
-          child: TextFormField(
-            initialValue: pageInput,
-            onChanged: (value) => pageInput = value,
-            autofocus: true,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: InputDecoration(
-              labelText: 'Page number',
-              helperText: 'Choose a page from 1 to $pages',
-            ),
-            validator: (value) {
-              final page = int.tryParse(value ?? '');
-              return page == null || page < 1 || page > pages
-                  ? 'Enter a number from 1 to $pages'
-                  : null;
-            },
-            onFieldSubmitted: (_) {
-              if (form.currentState!.validate()) {
-                Navigator.pop(context, int.parse(pageInput) - 1);
-              }
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (form.currentState!.validate()) {
-                Navigator.pop(context, int.parse(pageInput) - 1);
-              }
-            },
-            child: const Text('Go'),
-          ),
-        ],
-      ),
-    );
-    if (mounted && selected != null) {
-      _goToPage(selected);
+  void _loadNearBottom() {
+    if (_scrollController.hasClients &&
+        _scrollController.position.extentAfter < 480) {
+      ref.read(activityTimelineProvider(_filter).notifier).loadMore();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(financialDataRevisionProvider, (_, next) {
-      if (_page != 0) {
-        setState(() => _page = 0);
-        _scrollToTop();
-      }
-    });
     final categoriesAsync = _filter.category != null
         ? ref.watch(categoriesProvider)
         : const AsyncData<List<TransactionCategory>>([]);
@@ -376,19 +466,18 @@ class _ActivityContentState extends ConsumerState<ActivityContent> {
       FinancialPeriod.month(DateTime.now()),
       _filter.period,
     }.toList()..sort((a, b) => b.start.compareTo(a.start));
-    final query = (filter: _filter, page: _page);
-    final pageAsync = ref.watch(activityPageProvider(query));
+    final timeline = ref.watch(activityTimelineProvider(_filter));
     final countAsync = ref.watch(activityCountProvider(_filter));
-    ref.listen(activityCountProvider(_filter), (_, next) {
-      final count = next.asData?.value;
-      if (count == null) return;
-      final lastPage = count == 0 ? 0 : (count - 1) ~/ activityPageSize;
-      if (_page > lastPage) setState(() => _page = lastPage);
+    final countLabel = countAsync.when(
+      skipLoadingOnRefresh: false,
+      skipLoadingOnReload: false,
+      data: (count) => '$count transactions',
+      loading: () => 'Counting transactions…',
+      error: (_, _) => 'Count unavailable',
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !timeline.loading && !timeline.failed) _loadNearBottom();
     });
-    final total = countAsync.asData?.value;
-    final totalPages = total == null
-        ? null
-        : (total + activityPageSize - 1) ~/ activityPageSize;
     final centralLabel = accountLabel(_filter.central.type);
     final detailedFilterSummary = [
       if (_filter.provider != null)
@@ -564,6 +653,9 @@ class _ActivityContentState extends ConsumerState<ActivityContent> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   labelStyle: TextStyle(
+                    fontFamily: Theme.of(
+                      context,
+                    ).textTheme.labelLarge?.fontFamily,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: scope == _filter.scope
@@ -680,8 +772,23 @@ class _ActivityContentState extends ConsumerState<ActivityContent> {
                 TextButton.icon(
                   onPressed: _advancedFilters,
                   icon: const Icon(Icons.tune, size: 18),
-                  label: const Text('Filters'),
+                  label: Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 4,
+                    children: [
+                      const Text('Filters'),
+                      const Text('·'),
+                      Text(countLabel),
+                    ],
+                  ),
                 ),
+                if (countAsync.hasError)
+                  IconButton(
+                    tooltip: 'Retry transaction count',
+                    onPressed: () =>
+                        ref.invalidate(activityCountProvider(_filter)),
+                    icon: const Icon(Icons.refresh, size: 18),
+                  ),
                 if (hasDetailedFilter)
                   TextButton(
                     onPressed: _clearUserFilters,
@@ -705,275 +812,19 @@ class _ActivityContentState extends ConsumerState<ActivityContent> {
               ),
             ),
         ],
-        content: pageAsync.when(
-          skipLoadingOnRefresh: false,
-          skipLoadingOnReload: false,
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, stack) => Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('Unable to load activity.'),
-                TextButton(
-                  onPressed: () => ref.invalidate(activityPageProvider(query)),
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          ),
-          data: (page) {
-            if (page.count == 0) {
-              return _ActivityEmptyState(
-                icon: Icons.receipt_long_outlined,
-                title: _filter.search.isEmpty
-                    ? 'Nothing to show yet'
-                    : 'No matching transactions',
-                message: _filter.search.isEmpty
-                    ? 'No activity found for this period and filters.'
-                    : 'Try a different search or adjust the period and filters.',
-              );
-            }
-            return ListView.builder(
-              controller: _scrollController,
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              itemCount: page.days.length,
-              itemBuilder: (context, index) {
-                final day = page.days[index];
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.only(
-                        top: index == 0 ? 0 : 12,
-                        bottom: 6,
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              DateFormat.yMMMMEEEEd().format(day.date),
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF0B1F3A),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppTheme.darkBlue.withValues(alpha: 0.06),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              '${day.records.length}',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: AppTheme.darkBlue,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Card(
-                      margin: EdgeInsets.zero,
-                      color: Colors.white,
-                      surfaceTintColor: Colors.transparent,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                        side: const BorderSide(color: Color(0xFFE8ECEF)),
-                      ),
-                      child: Column(
-                        children: [
-                          for (var i = 0; i < day.records.length; i++) ...[
-                            TransactionRow(
-                              record: day.records[i],
-                              central: _filter.central,
-                              fullWidthMetadata: true,
-                              onTap: day.records[i].id == null
-                                  ? null
-                                  : () => Navigator.of(context).push(
-                                      MaterialPageRoute<void>(
-                                        builder: (_) => TransactionDetailScreen(
-                                          recordId: day.records[i].id!,
-                                          central: _filter.central,
-                                        ),
-                                      ),
-                                    ),
-                            ),
-                            if (i < day.records.length - 1)
-                              const Divider(
-                                height: 1,
-                                indent: 16,
-                                endIndent: 16,
-                              ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              },
-            );
-          },
-        ),
-        pagination: Container(
-          margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE8ECEF)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  IconButton(
-                    tooltip: 'First page',
-                    constraints: const BoxConstraints(
-                      minWidth: 40,
-                      minHeight: 32,
-                    ),
-                    padding: EdgeInsets.zero,
-                    style: IconButton.styleFrom(
-                      minimumSize: const Size(40, 32),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    icon: const Icon(Icons.first_page_rounded),
-                    onPressed: _page == 0 || pageAsync.isLoading
-                        ? null
-                        : () => _goToPage(0),
-                  ),
-                  IconButton(
-                    tooltip: 'Previous page',
-                    constraints: const BoxConstraints(
-                      minWidth: 40,
-                      minHeight: 32,
-                    ),
-                    padding: EdgeInsets.zero,
-                    style: IconButton.styleFrom(
-                      minimumSize: const Size(40, 32),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    icon: const Icon(Icons.chevron_left_rounded),
-                    onPressed: _page == 0 || pageAsync.isLoading
-                        ? null
-                        : () => _goToPage(_page - 1),
-                  ),
-                  Expanded(
-                    child: TextButton(
-                      style: TextButton.styleFrom(
-                        minimumSize: const Size(0, 32),
-                        padding: EdgeInsets.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      onPressed:
-                          totalPages == null ||
-                              totalPages <= 1 ||
-                              pageAsync.isLoading
-                          ? null
-                          : () => _choosePage(totalPages),
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          totalPages == null
-                              ? '${_page + 1} of ?'
-                              : totalPages == 0
-                              ? '0 of 0'
-                              : '${_page + 1} of $totalPages',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.darkBlue,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Next page',
-                    constraints: const BoxConstraints(
-                      minWidth: 40,
-                      minHeight: 32,
-                    ),
-                    padding: EdgeInsets.zero,
-                    style: IconButton.styleFrom(
-                      minimumSize: const Size(40, 32),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    icon: const Icon(Icons.chevron_right_rounded),
-                    onPressed:
-                        pageAsync.isLoading ||
-                            !(pageAsync.valueOrNull?.hasMore ?? false)
-                        ? null
-                        : () => _goToPage(_page + 1),
-                  ),
-                  IconButton(
-                    tooltip: 'Last page',
-                    constraints: const BoxConstraints(
-                      minWidth: 40,
-                      minHeight: 32,
-                    ),
-                    padding: EdgeInsets.zero,
-                    style: IconButton.styleFrom(
-                      minimumSize: const Size(40, 32),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    icon: const Icon(Icons.last_page_rounded),
-                    onPressed:
-                        totalPages == null ||
-                            totalPages <= 1 ||
-                            _page >= totalPages - 1 ||
-                            pageAsync.isLoading
-                        ? null
-                        : () => _goToPage(totalPages - 1),
-                  ),
-                ],
-              ),
-              if (countAsync.hasError)
-                TextButton(
-                  onPressed: () =>
-                      ref.invalidate(activityCountProvider(_filter)),
-                  child: const Text('Unable to count transactions. Retry'),
-                )
-              else
-                Text(
-                  total == null
-                      ? 'Counting transactions…'
-                      : '$total transactions${totalPages == 0 ? ' · 0 pages' : ''}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppTheme.darkBlue,
-                  ),
-                ),
-            ],
-          ),
-        ),
+        content: _timeline(timeline),
       ),
     );
   }
 }
 
-/// Keep paging above navigation; let controls scroll when the keyboard or
+/// Keep timeline above navigation; let controls scroll when the keyboard or
 /// landscape leaves too little height. The widget hierarchy stays stable on
 /// resize, preserving search focus, query state and the transaction controller.
 class _ActivityLayout extends StatelessWidget {
   final List<Widget> controls;
-  final Widget content, pagination;
-  const _ActivityLayout({
-    required this.controls,
-    required this.content,
-    required this.pagination,
-  });
+  final Widget content;
+  const _ActivityLayout({required this.controls, required this.content});
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
@@ -994,7 +845,6 @@ class _ActivityLayout extends StatelessWidget {
             ),
           ),
           Expanded(child: content),
-          pagination,
         ],
       );
     },

@@ -28,7 +28,7 @@ class YourDataScreen extends ConsumerWidget {
         : title.startsWith('Raw SMS')
         ? Icons.sms_outlined
         : title.startsWith('Categories')
-        ? Icons.category_outlined
+        ? Icons.label_outline_rounded
         : title.startsWith('Categorization')
         ? Icons.rule_outlined
         : title.startsWith('Registered')

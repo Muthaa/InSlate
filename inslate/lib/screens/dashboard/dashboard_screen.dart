@@ -307,7 +307,7 @@ class _DashboardHeader extends ConsumerWidget {
       theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
     );
     final extraHeight = titleHeight + 2 + subtitleHeight - 48;
-    return 192 +
+    return 170 +
         MediaQuery.paddingOf(context).top +
         (extraHeight > 0 ? extraHeight : 0);
   }
@@ -319,10 +319,10 @@ class _DashboardHeader extends ConsumerWidget {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.only(
-        top: MediaQuery.paddingOf(context).top + 14,
+        top: MediaQuery.paddingOf(context).top + 8,
         left: 20,
         right: 16,
-        bottom: 18,
+        bottom: 8,
       ),
       decoration: const BoxDecoration(color: Color(0xFF0B1F3A)),
       child: Row(

@@ -1,3 +1,5 @@
+import '../helpers/activity_scroll.dart';
+import 'package:inslate/models/activity_cursor.dart';
 import 'package:drift/native.dart';
 import 'package:inslate/models/financial_instrument.dart';
 import 'package:inslate/repositories/financial_instruments_repository.dart';
@@ -34,10 +36,16 @@ class _Repository extends FinancialRecordsRepository {
     ActivityFilter filter, {
     int? limit,
     int offset = 0,
+    ActivityCursor? before,
   }) {
     reads++;
     last = filter;
-    return super.getActivity(filter, limit: limit, offset: offset);
+    return super.getActivity(
+      filter,
+      limit: limit,
+      offset: offset,
+      before: before,
+    );
   }
 
   @override
@@ -133,26 +141,22 @@ void main() {
       });
 
   screenTest(
-    'category selection resets page and composes with search, exact count and pagination',
+    'category selection resets loaded results and composes with search, exact count and scrolling',
     (tester) async {
       await seed();
       await open(tester);
-      await tap(tester, find.text('Next'));
-      expect(find.text('Page 2'), findsOneWidget);
+      await scrollActivityToEnd(tester);
       await tester.enterText(search, 'Alice');
       await tester.pump(const Duration(milliseconds: 300));
       await tester.pumpAndSettle();
       await choose(tester, 'Food & groceries (expense)');
-      expect(find.text('Page 1'), findsOneWidget);
       expect(find.text('61 transactions'), findsOneWidget);
       expect(records.last!.search, 'alice');
       expect(records.last!.category, food);
-      await tap(tester, find.text('Next'));
-      expect(find.text('Page 2'), findsOneWidget);
-      expect(find.byType(TransactionRow), findsNWidgets(11));
+      await scrollActivityToEnd(tester);
+      expect(find.byType(TransactionRow), findsWidgets);
       await choose(tester, 'Uncategorized');
       expect(find.text('2 transactions'), findsOneWidget);
-      expect(find.text('Page 1'), findsOneWidget);
     },
   );
   screenTest(
@@ -197,22 +201,21 @@ void main() {
     );
   });
   screenTest(
-    'detail category edits refresh filtered page/count while retaining valid page and search',
+    'detail category edits refresh filtered timeline/count while retaining search',
     (tester) async {
       await seed();
       await open(
         tester,
         filter: ActivityFilter(period: period, search: 'alice', category: food),
       );
-      await tap(tester, find.text('Next'));
+      await scrollActivityToEnd(tester);
       final monthReads = records.months;
       await tap(tester, find.byType(TransactionRow).first);
       await tap(tester, find.text('Clear category'));
       await tester.pageBack();
       await tester.pumpAndSettle();
-      expect(find.text('Page 2'), findsOneWidget);
       expect(find.text('60 transactions'), findsOneWidget);
-      expect(find.byType(TransactionRow), findsNWidgets(10));
+      expect(find.byType(TransactionRow), findsWidgets);
       expect(records.last!.category, food);
       expect(records.last!.search, 'alice');
       expect(records.last!.period, period);
@@ -220,21 +223,20 @@ void main() {
     },
   );
   screenTest(
-    'edits clamp a vanished last page and unfiltered views avoid assignment refresh',
+    'edits refresh a shortened loaded range and unfiltered views avoid assignment refresh',
     (tester) async {
       await seed(51);
       await open(
         tester,
         filter: ActivityFilter(period: period, category: food),
       );
-      await tap(tester, find.text('Next'));
+      await scrollActivityToEnd(tester);
       final id = tester
           .widget<TransactionRow>(find.byType(TransactionRow).first)
           .record
           .id!;
       await categories.removeAssignment(id);
       await tester.pumpAndSettle();
-      expect(find.text('Page 1'), findsOneWidget);
       expect(find.text('50 transactions'), findsOneWidget);
       await tap(tester, find.text('Clear filters'));
       final reads = records.reads;
@@ -314,7 +316,7 @@ void main() {
     },
   );
   screenTest(
-    'instrument association preserves Activity page, search, category and Dashboard constraints without reloading',
+    'instrument association preserves Activity search, category and Dashboard constraints',
     (tester) async {
       await seed();
       final instrument = await FinancialInstrumentsRepository(
@@ -328,8 +330,7 @@ void main() {
         search: 'Alice',
       );
       await open(tester, filter: filter, drillDown: true);
-      await tap(tester, find.text('Next'));
-      expect(find.text('Page 2'), findsOneWidget);
+      await scrollActivityToEnd(tester);
       expect(find.text('61 transactions'), findsOneWidget);
       final reads = records.reads;
       final months = records.months;
@@ -352,15 +353,14 @@ void main() {
       await tap(tester, find.byKey(ValueKey('link.choose.${instrument.id}')));
       await tester.pageBack();
       await tester.pumpAndSettle();
-      expect(find.text('Page 2'), findsOneWidget);
       expect(find.text('61 transactions'), findsOneWidget);
       expect(tester.widget<TextField>(search).controller!.text, 'alice');
       expect(records.last, snapshot);
       expect(records.last!.period, period);
       expect(records.last!.category, food);
       expect(records.last!.subtype, RecordSubtype.sendMoney);
-      expect(records.reads, reads);
-      expect(records.months, months);
+      expect(records.reads, greaterThan(reads));
+      expect(records.months, greaterThanOrEqualTo(months));
     },
   );
 }

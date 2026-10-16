@@ -4,6 +4,8 @@ import '../app_database.dart';
 import '../tables/financial_records.dart';
 import '../../models/financial_period.dart';
 import '../../models/activity_filter.dart';
+import '../../models/activity_cursor.dart';
+import '../../models/activity_amount_search.dart';
 import '../../core/enums/record_subtype.dart';
 import '../../services/financial_semantics.dart';
 
@@ -72,6 +74,15 @@ class FinancialRecordsDao extends DatabaseAccessor<AppDatabase>
               Variable<String>(filter.search),
             ]).isBiggerThanValue(0);
       }
+      final amount = ActivityAmountSearch.parse(filter.search);
+      if (amount != null) {
+        search =
+            search |
+            (amount.exact
+                ? financialRecords.amount.equals(amount.lower)
+                : financialRecords.amount.isBiggerOrEqualValue(amount.lower) &
+                      financialRecords.amount.isSmallerThanValue(amount.upper));
+      }
       predicate = predicate & search;
     }
     final subtypes = RecordSubtype.values.where(filter.acceptsSubtype).toList();
@@ -139,6 +150,7 @@ class FinancialRecordsDao extends DatabaseAccessor<AppDatabase>
     ActivityFilter filter, {
     int? limit,
     int offset = 0,
+    ActivityCursor? before,
   }) {
     if (offset < 0 || (limit != null && limit <= 0)) {
       throw ArgumentError('Invalid page bounds');
@@ -149,6 +161,14 @@ class FinancialRecordsDao extends DatabaseAccessor<AppDatabase>
         (_) => OrderingTerm.desc(_effectiveDate),
         (row) => OrderingTerm.desc(row.id),
       ]);
+    if (before != null) {
+      query.where(
+        (r) =>
+            _effectiveDate.isSmallerThanValue(before.timestamp) |
+            (_effectiveDate.equals(before.timestamp) &
+                r.id.isSmallerThanValue(before.id)),
+      );
+    }
     if (limit != null) query.limit(limit, offset: offset);
     if (limit == null && offset > 0) query.limit(-1, offset: offset);
     return query.get();

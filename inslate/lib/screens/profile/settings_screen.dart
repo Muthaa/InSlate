@@ -6,7 +6,7 @@ import '../../providers/app_lock_provider.dart';
 import '../../providers/app_preferences_provider.dart';
 import 'your_data_screen.dart';
 
-enum ProfileSetting { appearance, privacy, backup, help }
+enum ProfileSetting { appearance, privacy, backup, help, export, contact }
 
 class SettingsScreen extends ConsumerStatefulWidget {
   final ProfileSetting setting;
@@ -45,6 +45,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ProfileSetting.privacy => 'Privacy & app lock',
       ProfileSetting.backup => 'Backup & restore',
       ProfileSetting.help => 'Help & about',
+      ProfileSetting.export => 'Export data',
+      ProfileSetting.contact => 'Contact us',
     };
     final colors = SlateColors.of(context);
     return Scaffold(
@@ -157,6 +159,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               label: const Text('Review your local data'),
             ),
           ],
+          if (widget.setting == ProfileSetting.export ||
+              widget.setting == ProfileSetting.contact)
+            SlateState(
+              kind: SlateStateKind.empty,
+              title: 'Future implementation',
+              message: widget.setting == ProfileSetting.export
+                  ? 'Data export is not available yet. Your records remain stored on this device.'
+                  : 'Contact support will be available in a future update.',
+            ),
           if (widget.setting == ProfileSetting.help) ...[
             SlateCard(
               child: Column(

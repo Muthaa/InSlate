@@ -142,6 +142,11 @@ class AppDatabase extends _$AppDatabase {
     },
     beforeOpen: (_) async {
       await customStatement('PRAGMA foreign_keys = ON');
+      // Read-side expression index; safe on existing v11 databases, no data or
+      // schema-version change. Matches Activity's stable cursor ordering.
+      await customStatement(
+        'CREATE INDEX IF NOT EXISTS financial_activity_cursor_idx ON financial_records(COALESCE(transaction_date, received_at) DESC, id DESC)',
+      );
     },
   );
 }

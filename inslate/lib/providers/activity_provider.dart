@@ -5,6 +5,20 @@ import '../models/financial_records.dart';
 import 'repository_providers.dart';
 import '../services/activity_grouping.dart';
 
+/// Invalidation only; never selects complete transaction history.
+final activityRecordsRevisionProvider = StreamProvider.autoDispose<int>((
+  ref,
+) async* {
+  final db = ref.watch(financialRecordsRepositoryProvider).database;
+  var revision = 0;
+  yield revision;
+  await for (final _ in db.tableUpdates(
+    TableUpdateQuery.onTable(db.financialRecords),
+  )) {
+    yield ++revision;
+  }
+});
+
 /// Import/resume only needs to increment this read-side refresh dependency.
 final financialDataRevisionProvider = StateProvider<int>((ref) => 0);
 const activityPageSize = 50;
@@ -42,6 +56,7 @@ final activityPageProvider = FutureProvider.autoDispose
 
 final activityMonthsProvider = FutureProvider.autoDispose<Set<DateTime>>((ref) {
   ref.watch(financialDataRevisionProvider);
+  ref.watch(activityRecordsRevisionProvider);
   return ref.watch(financialRecordsRepositoryProvider).getEffectiveMonths();
 });
 
@@ -53,6 +68,7 @@ final activityCountProvider = FutureProvider.autoDispose
           activityCategoryRevisionProvider.select((v) => v.valueOrNull ?? 0),
         );
       }
+      ref.watch(activityRecordsRevisionProvider);
       return ref
           .watch(financialRecordsRepositoryProvider)
           .countActivity(filter);

@@ -1,3 +1,4 @@
+import '../helpers/activity_scroll.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -177,14 +178,14 @@ void main() {
       );
       expect(tester.widget<TextField>(search).controller!.text, 'retained');
       expect(
-        tester.getRect(find.byTooltip('Next page')).bottom,
+        tester.getRect(find.text('No matching transactions')).bottom,
         lessThanOrEqualTo(424),
       );
       expect(tester.takeException(), isNull);
       FocusManager.instance.primaryFocus?.unfocus();
     },
   );
-  uiTest('Activity pagination and snackbars stay above the app navigation', (
+  uiTest('Activity timeline and snackbars stay above the app navigation', (
     tester,
   ) async {
     device(tester, bottom: 48);
@@ -198,12 +199,12 @@ void main() {
     await tab(tester, 'Activity');
     final navigation = tester.getRect(find.byType(NavigationBar));
     expect(
-      tester.getRect(find.byTooltip('Next page')).bottom,
+      tester.getRect(find.byKey(const ValueKey('activity.timeline'))).bottom,
       lessThanOrEqualTo(navigation.top),
     );
-    await tester.tap(find.byTooltip('Next page'));
-    await tester.pumpAndSettle();
-    expect(find.text('2 of 2'), findsOneWidget);
+    await scrollActivityToEnd(tester);
+    expect(find.text('55 transactions'), findsOneWidget);
+    expect(find.byTooltip('Next page'), findsNothing);
     ScaffoldMessenger.of(
       tester.element(find.byType(AppShell)),
     ).showSnackBar(const SnackBar(content: Text('Navigation test')));

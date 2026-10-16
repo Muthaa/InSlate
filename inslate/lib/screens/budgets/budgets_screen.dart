@@ -468,7 +468,7 @@ class _BudgetFormState extends ConsumerState<_BudgetForm> {
                     initialValue: valid ? _scope : 'deleted',
                     decoration: fieldDecoration(
                       'Scope',
-                      Icons.category_outlined,
+                      Icons.label_outline_rounded,
                     ),
                     items: [
                       const DropdownMenuItem(

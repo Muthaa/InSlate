@@ -1,3 +1,5 @@
+import '../helpers/activity_scroll.dart';
+import 'package:inslate/widgets/transaction_row.dart';
 import 'dart:async';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -173,32 +175,77 @@ void main() {
     expect(find.text('Into M-PESA · from KCB M-PESA'), findsOneWidget);
   });
 
-  testWidgets('paged explorer resets after refresh and filter change', (
+  testWidgets(
+    'infinite timeline renders lazily and refresh retains loaded depth',
+    (tester) async {
+      repository.records = [
+        for (var i = 0; i < 123; i++)
+          record(RecordSubtype.sendMoney, i.toDouble()),
+      ];
+      await open(tester);
+      expect(find.text('123 transactions'), findsOneWidget);
+      expect(find.byType(TransactionRow).evaluate().length, lessThan(50));
+      expect(repository.activityReads, 1);
+      await scrollActivityToEnd(tester);
+      expect(find.text('−KSh 122.00'), findsOneWidget);
+      expect(repository.activityReads, 3);
+      expect(find.byTooltip('Next page'), findsNothing);
+      await tester.tap(find.byTooltip('Refresh activity'));
+      await tester.pumpAndSettle();
+      expect(repository.activityReads, 6);
+      expect(find.text('−KSh 122.00'), findsOneWidget);
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Income'));
+      await tester.pumpAndSettle();
+      expect(find.text('0 transactions'), findsOneWidget);
+      expect(find.text('Nothing to show yet'), findsOneWidget);
+    },
+  );
+
+  testWidgets('append errors keep loaded rows and expose a bottom retry', (
     tester,
   ) async {
     repository.records = [
-      for (var i = 0; i < 55; i++)
+      for (var i = 0; i < 70; i++)
         record(RecordSubtype.sendMoney, i.toDouble()),
     ];
     await open(tester);
-    await tester.tap(find.byTooltip('Next page'));
+    repository.fail = true;
+    await scrollActivityToEnd(tester);
+    expect(find.text('Unable to load more activity.'), findsOneWidget);
+    expect(find.byType(TransactionRow), findsWidgets);
+    repository.fail = false;
+    await tester.tap(find.text('Retry loading activity'));
     await tester.pumpAndSettle();
-    expect(find.text('2 of 2'), findsOneWidget);
-    expect(find.text('−KSh 54.00'), findsOneWidget);
-    expect(
-      tester
-          .widget<IconButton>(
-            find.byWidgetPredicate(
-              (widget) => widget is IconButton && widget.tooltip == 'Next page',
-            ),
-          )
-          .onPressed,
-      isNull,
-    );
-    await tester.tap(find.byTooltip('Refresh activity'));
-    await tester.pumpAndSettle();
-    expect(find.text('1 of 2'), findsOneWidget);
+    await scrollActivityToEnd(tester);
+    expect(find.text('Unable to load more activity.'), findsNothing);
+    expect(find.text('−KSh 69.00'), findsOneWidget);
+    expect(find.text('70 transactions'), findsOneWidget);
   });
+
+  testWidgets(
+    'count failures and loading never expose a previous filtered count',
+    (tester) async {
+      repository.records = [record(RecordSubtype.receiveMoney, 1)];
+      await open(tester);
+      expect(find.text('1 transactions'), findsOneWidget);
+      final gate = Completer<void>();
+      repository.pendingRead = gate.future;
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Expenses'));
+      await tester.pump();
+      expect(find.text('1 transactions'), findsNothing);
+      expect(find.text('Counting transactions…'), findsOneWidget);
+      repository.fail = true;
+      gate.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('Count unavailable'), findsOneWidget);
+      expect(find.text('1 transactions'), findsNothing);
+      repository.fail = false;
+      await tester.tap(find.byTooltip('Retry transaction count'));
+      await tester.pumpAndSettle();
+      expect(find.text('0 transactions'), findsOneWidget);
+      expect(find.text('Count unavailable'), findsNothing);
+    },
+  );
 
   testWidgets('initial typed transfer drill-down works and can clear filters', (
     tester,
@@ -241,50 +288,6 @@ void main() {
     );
     expect(find.text('+KSh 100.00'), findsOneWidget);
   });
-
-  testWidgets(
-    'counted pagination supports last, first, and validated page jump',
-    (tester) async {
-      repository.records = [
-        for (var i = 0; i < 123; i++)
-          record(RecordSubtype.sendMoney, i.toDouble()),
-      ];
-      await open(tester);
-      expect(find.text('123 transactions'), findsOneWidget);
-      expect(find.text('1 of 3'), findsOneWidget);
-      await tester.tap(find.byTooltip('Last page'));
-      await tester.pumpAndSettle();
-      expect(find.text('3 of 3'), findsOneWidget);
-      expect(
-        tester
-            .widget<IconButton>(
-              find.byWidgetPredicate(
-                (widget) =>
-                    widget is IconButton && widget.tooltip == 'Last page',
-              ),
-            )
-            .onPressed,
-        isNull,
-      );
-      await tester.tap(find.byTooltip('First page'));
-      await tester.pumpAndSettle();
-      expect(find.text('1 of 3'), findsOneWidget);
-      await tester.tap(find.text('1 of 3'));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextFormField), '4');
-      await tester.tap(find.text('Go'));
-      await tester.pumpAndSettle();
-      expect(find.text('Enter a number from 1 to 3'), findsOneWidget);
-      await tester.enterText(find.byType(TextFormField), '2');
-      await tester.tap(find.text('Go'));
-      await tester.pumpAndSettle();
-      expect(find.text('2 of 3'), findsOneWidget);
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Income'));
-      await tester.pumpAndSettle();
-      expect(find.text('0 transactions · 0 pages'), findsOneWidget);
-      expect(find.text('0 of 0'), findsOneWidget);
-    },
-  );
 
   testWidgets(
     'range selector offers presets and applies custom range without losing scope',
